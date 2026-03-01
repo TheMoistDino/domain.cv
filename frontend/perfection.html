@@ -1,0 +1,315 @@
+Sukuna
+https://preview.redd.it/how-groundbreaking-would-it-be-if-sukuna-never-used-his-v0-a4u80x8t37ye1.jpeg?width=640&crop=smart&auto=webp&s=34d2b70b96dc7eac4b5cd57474a3b3475e33787c
+
+Yuta
+https://preview.redd.it/yall-think-yuta-is-even-gonna-get-to-use-his-domain-v0-jw1f01j4e6ec1.jpeg?auto=webp&s=f3929e9c2108756e6e0c4a2a3f7458d42138b5fc
+
+Jogo
+https://animehunch.com/wp-content/uploads/2021/07/Jogo-DE-hand-sign.jpg
+
+Gojo
+https://i.redd.it/4mqp54rks99f1.jpeg
+https://www.youtube.com/shorts/8vG8E6RT-vw
+
+
+Dagon 
+https://i.ytimg.com/vi/2aK-_mXT5k0/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLDyB3XbXnzayT6mZfa3fYPmA4FM6w
+
+Mahito
+https://static.wikia.nocookie.net/jujutsu-kaisen/images/e/e7/Mahito_activating_his_Domain_Expansion_%28Anime%29.png/revision/latest?cb=20210314214514
+
+Megumi Fushiguro
+https://64.media.tumblr.com/b58186b6056cf92fdbf1029aa0a4b8e0/bb5f7f27c2f6cf87-96/s540x810/c820901cef15ff0cbc6af70981bb8b1b2b90f189.png
+
+Higuruma: mallet
+
+Hakari
+https://preview.redd.it/i-just-realized-hakaris-dm-sign-stands-for-perfect-v0-15x2cf0qyxfd1.png?auto=webp&s=42ea61b48a7cc9a294c6b3decbdcf91d6280519f
+
+Kenjaku https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5r0P7EZ683LUoJnrvS6j4J8G-fbQur0EgiQ&s
+
+Yorozu
+https://preview.redd.it/yorozus-de-should-have-been-something-intrinsically-related-v0-lf9m00037n7b1.png?width=893&format=png&auto=webp&s=d3b9b54e43601cd82fd4efcc95b62e2cfca0f230
+
+YUUUUUUUji
+https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTDOm7VJ4QYWGrDoWmHN7fArc0z3Qosx_e3Tg&s
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Domain Expansion: Self-Embodiment of Perfection</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@200;300;900&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; cursor:none; font-family:'Noto Serif JP',serif; }
+#gl-canvas { position:fixed; top:0; left:0; z-index:0; display:block; }
+#fx-canvas { position:fixed; top:0; left:0; z-index:1; pointer-events:none; }
+#flash { position:fixed;inset:0;z-index:20;pointer-events:none;background:#0a1118;opacity:0; }
+
+
+#domain-title {
+ position:fixed;bottom:50px;left:50%;transform:translateX(-50%);
+ z-index:9;text-align:center;opacity:0;pointer-events:none;white-space:nowrap;
+}
+#domain-title .jp { font-size:11px;letter-spacing:.6em;color:rgba(150,200,255,.7);display:block;margin-bottom:7px;font-weight:200; }
+#domain-title .en {
+ font-size:26px;letter-spacing:.28em;color:rgba(255,255,255,.9);display:block;font-weight:900;
+ text-shadow:0 0 20px rgba(0,150,255,.9),0 0 50px rgba(0,80,200,.6),0 0 100px rgba(0,40,100,.3);
+}
+
+
+#video-container {
+ position:fixed;bottom:22px;right:22px;width:250px;height:162px;border-radius:10px;
+ border:1px solid rgba(0,150,255,.2);overflow:hidden;z-index:12;transform:scaleX(-1);
+ box-shadow:0 0 20px rgba(0,0,0,.8);transition:border-color .6s,box-shadow .6s;
+}
+#video-container.active { border-color:rgba(0,200,255,.6);box-shadow:0 0 40px rgba(0,120,255,.4); }
+.input_video { width:100%;height:100%;object-fit:cover;display:block; }
+
+
+#hint { position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font-family:monospace;font-size:10px;color:rgba(255,255,255,.08);z-index:9;letter-spacing:.15em;pointer-events:none; }
+</style>
+
+
+<script type="importmap">
+ {
+   "imports": {
+     "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+     "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+   }
+ }
+</script>
+</head>
+<body>
+
+
+<canvas id="gl-canvas"></canvas>
+<canvas id="fx-canvas"></canvas>
+<div id="flash"></div>
+<div id="domain-title"><span class="jp">自閉円頓裹</span><span class="en">SELF-EMBODIMENT OF PERFECTION</span></div>
+<div id="video-container"><video class="input_video" id="input_video" autoplay playsinline></video></div>
+<div id="hint">Waiting for external script to trigger 'mahito'...</div>
+
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+
+// --- GLOBAL STATE ---
+window.currentDomain = 'neutral';
+let prev = 'neutral', phase = 'idle', phaseT = 0, domainT = 0, flash = 0, shake = 0, dt = 0, lastTime = 0;
+
+
+const flashEl = document.getElementById('flash');
+const titleEl = document.getElementById('domain-title');
+const videoEl = document.getElementById('video-container');
+const fxC = document.getElementById('fx-canvas');
+const X = fxC.getContext('2d');
+let W, H;
+
+
+// --- THREE.JS SETUP ---
+const canvas = document.getElementById('gl-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x05050a, 0.02); // Void fog
+
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+
+function resize() {
+   W = fxC.width = window.innerWidth;
+   H = fxC.height = window.innerHeight;
+   renderer.setSize(W, H);
+   camera.aspect = W / H;
+   camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+
+// --- LIGHTING ---
+const ambientLight = new THREE.AmbientLight(0x101520, 3.0);
+scene.add(ambientLight);
+
+
+// A strong central cyan light to illuminate the massive structure
+const pointLight = new THREE.PointLight(0x00aaff, 800, 100);
+pointLight.position.set(0, 15, 0);
+scene.add(pointLight);
+
+
+// A secondary eerie blue light from below
+const bottomLight = new THREE.DirectionalLight(0x3366ff, 2.0);
+bottomLight.position.set(0, -10, 0);
+scene.add(bottomLight);
+
+
+// --- THE DOMAIN ---
+const domainGroup = new THREE.Group();
+domainGroup.visible = false;
+scene.add(domainGroup);
+
+
+// LOAD THE USERS CUSTOM GLB FILE
+const loader = new GLTFLoader();
+const MODEL_URL = './self_embodiment_of_perfection__jujutsu_kaisen.glb'; // <--- LOADED HERE
+
+
+loader.load(MODEL_URL, function(gltf) {
+   const mahitoDomain = gltf.scene;
+  
+   // NOTE: Depending on how the 3D model was exported, you may need to tweak these numbers!
+   mahitoDomain.scale.set(5, 5, 5);     // Change to (5, 5, 5) if it's too small
+   mahitoDomain.position.set(0, -3, 0);  // Center it
+  
+   // Add the entire model to the scene directly
+   domainGroup.add(mahitoDomain);
+
+
+}, undefined, function(error) {
+   console.error('Error loading the GLB model:', error);
+   document.getElementById('hint').innerText = "Error: Couldn't find the .glb file. Is it in the same folder?";
+});
+
+
+// --- SOUL PARTICLES ---
+const particleCount = 400;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(particleCount * 3);
+const pVel = [];
+
+
+for(let i=0; i<particleCount; i++) {
+   pPos[i*3] = (Math.random() - 0.5) * 60;
+   pPos[i*3+1] = Math.random() * 30;
+   pPos[i*3+2] = (Math.random() - 0.5) * 60;
+   pVel.push({
+       y: 0.02 + Math.random() * 0.05,
+       driftX: (Math.random() - 0.5) * 0.03,
+       driftZ: (Math.random() - 0.5) * 0.03,
+       offset: Math.random() * Math.PI * 2
+   });
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ color: 0x88ccff, size: 0.4, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+const soulParticles = new THREE.Points(pGeo, pMat);
+domainGroup.add(soulParticles);
+
+
+// --- 2D FX ---
+const SLASHES = Array.from({length: 40}, () => ({
+   x0: Math.random(), y0: Math.random(), angle: (Math.random() - 0.5) * Math.PI * 2,
+   len: 0.5 + Math.random() * 1.5, width: 2 + Math.random() * 8, speed: 4 + Math.random() * 6,
+   progress: -(Math.random() * 0.8),
+   col: Math.random() > 0.5 ? [10, 15, 20] : [0, 200, 255], bright: 0.7 + Math.random() * 0.5
+}));
+
+
+function drawSlashBurst(amt) {
+   SLASHES.forEach(s => {
+       s.progress += dt * s.speed;
+       if(s.progress > 1.5) { s.progress = -(Math.random() * 0.2); s.x0 = Math.random(); s.y0 = Math.random(); s.angle = (Math.random() - 0.5) * Math.PI * 2; s.len = 0.6 + Math.random() * 1.0; }
+       if(s.progress < 0) return;
+       const p = Math.min(s.progress, 1), diag = Math.sqrt(W * W + H * H);
+       const tip = p * s.len * diag, tail = Math.max(0, tip - s.len * diag * 0.4);
+       const tx = s.x0 * W + Math.cos(s.angle) * tip, ty = s.y0 * H + Math.sin(s.angle) * tip;
+       const bx = s.x0 * W + Math.cos(s.angle) * tail, by = s.y0 * H + Math.sin(s.angle) * tail;
+       const fade = p > 0.7 ? (1 - p) / 0.3 : 1, a = fade * s.bright * amt;
+       const [r, g, b] = s.col;
+       const sg = X.createLinearGradient(bx, by, tx, ty);
+       sg.addColorStop(0, `rgba(${r},${g},${b},0)`); sg.addColorStop(0.5, `rgba(${r},${g},${b},${a})`); sg.addColorStop(1, `rgba(${r},${g},${b},${a})`);
+       X.beginPath(); X.moveTo(bx, by); X.lineTo(tx, ty); X.strokeStyle = sg; X.lineWidth = s.width * (1 + p * 2); X.stroke();
+   });
+}
+
+
+// --- ANIMATION LOOP ---
+function animate(now) {
+   requestAnimationFrame(animate);
+   dt = Math.min((now - (lastTime || now)) / 1000, 0.033); lastTime = now;
+
+
+   if(window.currentDomain === 'mahito' && prev === 'neutral') {
+       phase = 'slash'; phaseT = 0; domainT = 0; flash = 1.0; shake = 6.0;
+       setTimeout(() => { flash = 0.8; shake = 4.0; }, 80); setTimeout(() => { flash = 0.4; }, 180);
+       SLASHES.forEach((s, i) => { s.progress = -(i / SLASHES.length) * 0.3; });
+   }
+   if(window.currentDomain === 'neutral' && prev === 'mahito') { phase = 'fadeout'; phaseT = 0; }
+   prev = window.currentDomain;
+
+
+   if(phase === 'slash') {
+       phaseT += dt; shake = Math.max(shake, 1.5 + Math.sin(phaseT * 25) * 0.6 + Math.random() * 1.5);
+       if(phaseT > 2.0) { phase = 'settle'; phaseT = 0; flash = 0.5; shake = 4.0; }
+   } else if(phase === 'settle') {
+       phaseT += dt; domainT += dt; if(phaseT > 0.8) { phase = 'domain'; phaseT = 0; shake = 0; }
+   } else if(phase === 'domain') { domainT += dt; shake = 0;
+   } else if(phase === 'fadeout') { phaseT += dt; domainT += dt; if(phaseT > 1.2) phase = 'idle'; }
+
+
+   // THREE.JS RENDER
+   if(phase === 'domain' || phase === 'settle' || phase === 'fadeout') {
+       domainGroup.visible = true;
+      
+       // Panning Camera
+       const ang = domainT * 0.1;
+       camera.position.set(Math.sin(ang) * 5, 2.0, Math.cos(ang) * 5); // Slowly walk around center
+       camera.lookAt(-15, 2, 0); // Look up at the giant structure
+      
+       // Eerie slight rotation of the domain itself
+       domainGroup.rotation.y = Math.sin(domainT * 0.05) * 0.1;
+      
+       // Souls
+       const positions = soulParticles.geometry.attributes.position.array;
+       for(let i=0; i<particleCount; i++) {
+           const v = pVel[i];
+           positions[i*3+1] += v.y;
+           positions[i*3] += v.driftX + Math.sin(domainT + v.offset) * 0.02;
+           positions[i*3+2] += v.driftZ + Math.cos(domainT + v.offset) * 0.02;
+           if(positions[i*3+1] > 30) positions[i*3+1] = 0;
+       }
+       soulParticles.geometry.attributes.position.needsUpdate = true;
+      
+       renderer.render(scene, camera);
+   } else {
+       domainGroup.visible = false; renderer.clear();
+   }
+
+
+   // 2D FX
+   X.clearRect(0, 0, W, H);
+   if(phase === 'slash') {
+       const a = Math.min(phaseT / 0.2, 1);
+       X.fillStyle = `rgba(5,10,15,${a})`; X.fillRect(0, 0, W, H); drawSlashBurst(a);
+   } else if(phase === 'settle') { drawSlashBurst(1 - Math.min(phaseT / 0.8, 1)); }
+
+
+   if(flash > 0.004) { flashEl.style.opacity = flash; flash *= 0.80; } else { flashEl.style.opacity = 0; flash = 0; }
+   if(shake > 0.01) {
+       const jx = (Math.random() - 0.5) * shake * 50, jy = (Math.random() - 0.5) * shake * 45, jr = (Math.random() - 0.5) * shake * 1.0;
+       canvas.style.transform = fxC.style.transform = `translate(${jx}px,${jy}px) rotate(${jr}deg)`; shake *= 0.85;
+   } else { canvas.style.transform = fxC.style.transform = ''; shake = 0; }
+
+
+   videoEl.classList.toggle('active', phase === 'domain');
+   titleEl.style.opacity = phase === 'domain' && domainT > 0.8 ? Math.min(1, (domainT - 0.8) / 0.8) : 0;
+}
+
+
+requestAnimationFrame(animate);
+
+
+// Video Feed
+(async()=>{ try{ const s=await navigator.mediaDevices.getUserMedia({video:true}); document.getElementById('input_video').srcObject=s; }catch(e){} })();
+</script>
+</body>
+</html>
+
