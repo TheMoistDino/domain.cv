@@ -291,6 +291,45 @@ class GestureRecognizer:
             return False
 
         return True
+    
+    @staticmethod
+    def detect_summon_mahoraga(hand1, hand2):
+        """
+        Megumi's Summoning of Mahoraga:
+        1. Hands are distinctly separated.
+        2. Both hands are tight fists (all fingers curled).
+        """
+        lm1, lm2 = hand1['landmarks'], hand2['landmarks']
+        wrist1, wrist2 = lm1[0], lm2[0]
+
+        # 1. Enforce Separation
+        wrist_dist = math.hypot(wrist1[0] - wrist2[0], wrist1[1] - wrist2[1])
+        hand_size = math.hypot(lm1[9][0] - wrist1[0], lm1[9][1] - wrist1[1]) 
+
+        # Wrists must be clearly separated
+        if wrist_dist < (hand_size * 2.0): 
+            return False
+
+        # Helper function for a tight fist
+        def is_tight_fist(lm, wrist):
+            # All 4 fingers curled
+            curled = not (GestureRecognizer.is_finger_extended(lm[8], lm[6], wrist) or
+                          GestureRecognizer.is_finger_extended(lm[12], lm[10], wrist) or
+                          GestureRecognizer.is_finger_extended(lm[16], lm[14], wrist) or
+                          GestureRecognizer.is_finger_extended(lm[20], lm[18], wrist))
+            
+            # Thumb wrapped over the index knuckle
+            thumb_tip, index_mcp = lm[4], lm[5]
+            thumb_dist = math.hypot(thumb_tip[0] - index_mcp[0], thumb_tip[1] - index_mcp[1])
+            thumb_wrapped = thumb_dist < (hand_size * 1.2)
+
+            return curled and thumb_wrapped
+
+        # 2. Check if both hands are tight fists
+        if is_tight_fist(lm1, wrist1) and is_tight_fist(lm2, wrist2):
+            return True
+
+        return False
 
     def _get_raw_domain(self, detected_hands):
         if not detected_hands:
@@ -302,6 +341,8 @@ class GestureRecognizer:
 
         # 2. Check for the other two-handed domains
         if len(detected_hands) >= 2:
+            if self.detect_summon_mahoraga(detected_hands[0], detected_hands[1]):
+                return "summon_mahoraga"
             if self.detect_self_embodiment_of_perfection(detected_hands[0], detected_hands[1]):
                 return "self_embodiment_of_perfection"
             if self.detect_malevolent_shrine(detected_hands[0], detected_hands[1]):
