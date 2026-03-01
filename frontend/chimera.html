@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Domain Expansion: Chimera Shadow Garden</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@200;300;900&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; cursor:none; font-family:'Noto Serif JP',serif; }
+canvas { position:fixed; top:0; left:0; display:block; }
+#gl  { z-index:0; }
+#fx  { z-index:1; pointer-events:none; }
+#flash { position:fixed;inset:0;z-index:20;pointer-events:none;background:#1a0033;opacity:0; }
+#domain-title {
+  position:fixed;bottom:50px;left:50%;transform:translateX(-50%);
+  z-index:9;text-align:center;opacity:0;pointer-events:none;white-space:nowrap;
+}
+#domain-title .jp { font-size:11px;letter-spacing:.6em;color:rgba(180,80,255,.7);display:block;margin-bottom:7px;font-weight:200; }
+#domain-title .en {
+  font-size:28px;letter-spacing:.28em;color:rgba(255,255,255,.9);display:block;font-weight:900;
+  text-shadow:0 0 20px rgba(150,0,255,.9),0 0 50px rgba(80,0,200,.6),0 0 100px rgba(40,0,100,.3);
+}
+#video-container {
+  position:fixed;bottom:22px;right:22px;width:250px;height:162px;border-radius:10px;
+  border:1px solid rgba(120,40,255,.2);overflow:hidden;z-index:12;transform:scaleX(-1);
+  box-shadow:0 0 20px rgba(0,0,0,.8);transition:border-color .6s,box-shadow .6s;
+}
+#video-container.active { border-color:rgba(180,0,255,.6);box-shadow:0 0 40px rgba(120,0,255,.4); }
+#input_video { width:100%;height:100%;object-fit:cover;display:block; }
+#hint { position:fixed;bottom:14px;left:50%;transform:translateX(-50%);font-family:monospace;font-size:10px;color:rgba(255,255,255,.08);z-index:9;letter-spacing:.15em;pointer-events:none; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="fx"></canvas>
+<div id="flash"></div>
+<div id="domain-title"><span class="jp">嵌合暗翳庭</span><span class="en">CHIMERA SHADOW GARDEN</span></div>
+<div id="video-container"><video id="input_video" autoplay playsinline></video></div>
+<div id="hint">Type `window.currentDomain = 'chimera'` in console</div>
+<script>
+(async()=>{ try{ const s=await navigator.mediaDevices.getUserMedia({video:true}); document.getElementById('input_video').srcObject=s; }catch(e){} })();
+
+window.currentDomain='neutral';
+let prev='neutral',phase='idle',phaseT=0,domainT=0,flash=0,shake=0,t=0,dt=0,lastTime=0;
+
+const flashEl = document.getElementById('flash');
+const titleEl = document.getElementById('domain-title');
+const videoEl = document.getElementById('video-container');
+
+const glC=document.getElementById('gl');
+const gl=glC.getContext('webgl',{antialias:true,alpha:false});
+const fxC=document.getElementById('fx');
+const X=fxC.getContext('2d');
+let W,H;
+
+function resize(){
+  W=glC.width=fxC.width=window.innerWidth;
+  H=glC.height=fxC.height=window.innerHeight;
+  gl.viewport(0,0,W,H);
+}
+window.addEventListener('resize',resize);
+
+// ── Shaders ───────────────────────────────────────────────────────────
+const VS=`
+attribute vec3 aPos;attribute vec3 aNorm;attribute vec3 aCol;
+uniform mat4 uMVP;uniform mat4 uModel;
+varying vec3 vN;varying vec3 vC;varying vec3 vWP;
+void main(){
+  vec4 wp=uModel*vec4(aPos,1.0);vWP=wp.xyz;
+  vN=normalize((uModel*vec4(aNorm,0.0)).xyz);vC=aCol;
+  gl_Position=uMVP*vec4(aPos,1.0);
+}`;
+const FS=`
+precision mediump float;
+varying vec3 vN;varying vec3 vC;varying vec3 vWP;
+uniform vec3 uLP;uniform vec3 uLC;uniform vec3 uAmb;uniform float uAlpha;
+void main(){
+  vec3 L=normalize(uLP-vWP);
+  float d=max(dot(vN,L),0.0);
+  vec3 rim=vec3(0.0,1.0,0.0);
+  float r=pow(1.0-max(dot(vN,normalize(rim)),0.0),3.0)*0.7; // Stronger rim light for the organic slime look
+  vec3 col=vC*(uAmb+uLC*d)+vC*r*vec3(0.8, 0.2, 1.0); // Purple rim tint
+  gl_FragColor=vec4(col,uAlpha);
+}`;
+const PVS=`
+attribute vec3 aPos;attribute float aSz;attribute vec3 aCol;
+uniform mat4 uVP; uniform mat4 uModel; varying vec3 vC;
+void main(){vC=aCol;gl_Position=uVP*uModel*vec4(aPos,1.0);gl_PointSize=aSz;}`;
+const PFS=`
+precision mediump float;varying vec3 vC;
+void main(){float d=length(gl_PointCoord-0.5);if(d>0.5)discard;gl_FragColor=vec4(vC,(1.0-d*2.0)*0.85);}`;
+
+function mkS(t,s){const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);return sh;}
+function mkP(v,f){const p=gl.createProgram();gl.attachShader(p,mkS(gl.VERTEX_SHADER,v));gl.attachShader(p,mkS(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);return p;}
+
+// ── Liquid Shadow Horizon Shader ──────────────────────────────────────
+const SKY_VS=`attribute vec2 aP;varying vec2 vUV;void main(){vUV=aP*.5+.5;gl_Position=vec4(aP,0.999,1.0);}`;
+const SKY_FS=`precision mediump float;varying vec2 vUV;uniform float uT;
+void main(){
+  float y=vUV.y;
+  vec3 sky;
+  if(y > 0.35) {
+      // Upper Realm (Pitch Black with faint magenta nebula)
+      float t = (y - 0.35) / 0.65;
+      vec3 top = vec3(0.01, 0.0, 0.02);
+      vec3 mid = vec3(0.05, 0.0, 0.1);
+      vec3 hor = vec3(0.2, 0.0, 0.3);
+      sky = mix(top, mid, smoothstep(0.0, 0.5, 1.0-t));
+      sky = mix(sky, hor, smoothstep(0.5, 1.0, 1.0-t));
+      
+      float n = sin(vUV.x*8.0 + uT*0.5) * cos(y*10.0 - uT*0.2);
+      sky += vec3(0.1, 0.0, 0.2) * max(0.0, n);
+  } else {
+      // Lower Realm (Liquid Shadows)
+      float t = y / 0.35;
+      vec3 bot = vec3(0.0, 0.0, 0.0);
+      vec3 hor = vec3(0.1, 0.0, 0.15);
+      sky = mix(bot, hor, t);
+      
+      // Moving ink ripples
+      float ripple = sin((vUV.x*20.0) + (y*50.0) - uT*4.0);
+      float ripple2 = cos((vUV.x*15.0) - (y*30.0) + uT*2.0);
+      sky += vec3(0.05, 0.0, 0.1) * smoothstep(0.8, 1.0, ripple * ripple2);
+  }
+  gl_FragColor=vec4(sky,1.0);
+}`;
+const prog=mkP(VS,FS),pProg=mkP(PVS,PFS),skyProg=mkP(SKY_VS,SKY_FS);
+
+// ── Matrix math ───────────────────────────────────────────────────────
+const m4=()=>new Float32Array(16);
+function ident(m){m.fill(0);m[0]=m[5]=m[10]=m[15]=1;return m;}
+function persp(o,fov,asp,n,f){
+  const t2=1/Math.tan(fov/2),nf=1/(n-f);
+  o.fill(0);o[0]=t2/asp;o[5]=t2;o[10]=(f+n)*nf;o[11]=-1;o[14]=2*f*n*nf;return o;
+}
+function lookAt(o,e,c,u){
+  let fx=c[0]-e[0],fy=c[1]-e[1],fz=c[2]-e[2];
+  let il=1/Math.sqrt(fx*fx+fy*fy+fz*fz);fx*=il;fy*=il;fz*=il;
+  let sx=fy*u[2]-fz*u[1],sy=fz*u[0]-fx*u[2],sz=fx*u[1]-fy*u[0];
+  il=1/Math.sqrt(sx*sx+sy*sy+sz*sz);sx*=il;sy*=il;sz*=il;
+  const ux=sy*fz-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy-sy*fx;
+  o[0]=sx;o[1]=ux;o[2]=-fx;o[3]=0;
+  o[4]=sy;o[5]=uy;o[6]=-fy;o[7]=0;
+  o[8]=sz;o[9]=uz;o[10]=-fz;o[11]=0;
+  o[12]=-(sx*e[0]+sy*e[1]+sz*e[2]);
+  o[13]=-(ux*e[0]+uy*e[1]+uz*e[2]);
+  o[14]= (fx*e[0]+fy*e[1]+fz*e[2]);
+  o[15]=1;return o;
+}
+function mul(o,a,b){for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=a[i+k*4]*b[k+j*4];o[i+j*4]=s;}return o;}
+
+// ── Geometry builder ──────────────────────────────────────────────────
+function GB(){this.v=[];this.idx=[];this.b=0;}
+GB.prototype.quad=function(p0,p1,p2,p3,c){
+  const ax=p1[0]-p0[0],ay=p1[1]-p0[1],az=p1[2]-p0[2];
+  const bx=p3[0]-p0[0],by=p3[1]-p0[1],bz=p3[2]-p0[2];
+  let nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx;
+  const l=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;nx/=l;ny/=l;nz/=l;
+  const b=this.b;
+  for(const p of[p0,p1,p2,p3])this.v.push(p[0],p[1],p[2],nx,ny,nz,c[0],c[1],c[2]);
+  this.idx.push(b,b+1,b+2,b,b+2,b+3);this.b+=4;
+};
+GB.prototype.tri=function(p0,p1,p2,c){
+  const ax=p1[0]-p0[0],ay=p1[1]-p0[1],az=p1[2]-p0[2];
+  const bx=p2[0]-p0[0],by=p2[1]-p0[1],bz=p2[2]-p0[2];
+  let nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx;
+  const l=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;nx/=l;ny/=l;nz/=l;
+  const b=this.b;
+  for(const p of[p0,p1,p2])this.v.push(p[0],p[1],p[2],nx,ny,nz,c[0],c[1],c[2]);
+  this.idx.push(b,b+1,b+2);this.b+=3;
+};
+GB.prototype.box=function(x0,y0,z0,x1,y1,z1,c,bright){
+  const f=bright?[c[0]*1.7,c[1]*1.7,c[2]*1.7]:c;
+  const dk=[c[0]*.45,c[1]*.45,c[2]*.45];
+  const md=[c[0]*.65,c[1]*.65,c[2]*.65];
+  this.quad([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],f);   
+  this.quad([x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1],dk);  
+  this.quad([x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1],dk);  
+  this.quad([x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0],md);  
+  this.quad([x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1],md);  
+  this.quad([x0,y0,z1],[x1,y0,z1],[x1,y0,z0],[x0,y0,z0],dk);  
+};
+GB.prototype.spike=function(bx,by,bz,tx,ty,tz,w,c){
+  this.tri([bx-w,by,bz-w],[bx+w,by,bz-w],[tx,ty,tz],c); 
+  this.tri([bx+w,by,bz-w],[bx+w,by,bz+w],[tx,ty,tz],c); 
+  this.tri([bx+w,by,bz+w],[bx-w,by,bz+w],[tx,ty,tz],c); 
+  this.tri([bx-w,by,bz+w],[bx-w,by,bz-w],[tx,ty,tz],c); 
+  this.quad([bx-w,by,bz-w],[bx-w,by,bz+w],[bx+w,by,bz+w],[bx+w,by,bz-w],c);
+};
+GB.prototype.build=function(){
+  const vb=gl.createBuffer(),ib=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.v),gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(this.idx),gl.STATIC_DRAW);
+  return{vb,ib,cnt:this.idx.length};
+};
+
+// ── Build Chimera Shadow Garden ───────────────────────────────────────
+function buildChimera(){
+  const g=new GB();
+  
+  // Color Palette
+  const SHADOW  = [0.02, 0.02, 0.03]; // Pitch black bone
+  const ORGANIC = [0.15, 0.05, 0.20]; // Deep purple flesh
+  const MAGENTA = [0.70, 0.10, 0.90]; // Glowing cursed energy
+  const BONE    = [0.20, 0.20, 0.25]; // Dark grey accents
+
+  // 1. The Shadow Pool Floor
+  g.box(-12, -0.5, -12, 12, 0, 12, SHADOW, false);
+
+  // 2. The Central Fused Organism (Spinal Column)
+  const segments = 12;
+  for(let i=0; i<segments; i++) {
+      let h = i * 1.1; // Height of this vertebrae
+      let w = 1.8 - (i * 0.12); // Tapers as it goes up
+      
+      // Central vertebrae block
+      g.box(-w, h, -w*0.5, w, h+0.9, w*0.5, BONE, false);
+      
+      // Fleshy membrane connecting them
+      g.box(-w*0.8, h-0.2, -w*0.4, w*0.8, h+1.1, w*0.4, ORGANIC, true);
+
+      // Rib-like tendrils branching out horizontally
+      let tx = (w + 2.0 + Math.random()*1.5);
+      let ty = h - 1.0;
+      let tz = (Math.random() - 0.5) * 5.0;
+      g.spike(-w, h+0.4, 0, -tx, ty, tz, w*0.3, SHADOW);
+      g.spike( w, h+0.4, 0,  tx, ty, tz, w*0.3, SHADOW);
+
+      // Magenta glowing nerve endings shooting upwards near the top
+      if (i > segments - 5) {
+          for(let j=0; j<3; j++) {
+              let nx = (Math.random()-0.5)*8;
+              let ny = h + 4 + Math.random()*4;
+              let nz = (Math.random()-0.5)*8;
+              g.spike(0, h+0.8, 0, nx, ny, nz, 0.15, MAGENTA);
+          }
+      }
+  }
+
+  // 3. Sprawling Ground Roots
+  for(let i=0; i<16; i++) {
+      let angle = (i / 16) * Math.PI * 2;
+      
+      // Thick base roots
+      let bx = Math.cos(angle) * 2.0;
+      let bz = Math.sin(angle) * 2.0;
+      let tx = Math.cos(angle + 0.5) * 12.0;
+      let tz = Math.sin(angle + 0.5) * 12.0;
+      g.spike(bx, 0, bz, tx, -0.2, tz, 0.6, SHADOW);
+      
+      // Inner glowing veins
+      let tx2 = Math.cos(angle - 0.3) * 7.0;
+      let tz2 = Math.sin(angle - 0.3) * 7.0;
+      g.spike(bx, 0.2, bz, tx2, 0, tz2, 0.2, MAGENTA);
+  }
+
+  // 4. Floating Shadow Totems / Toads in the distance
+  for(let i=0; i<8; i++) {
+      let angle = (i/8) * Math.PI * 2 + 0.5;
+      let x = Math.cos(angle) * 9.0;
+      let z = Math.sin(angle) * 9.0;
+      g.box(x-0.8, 0, z-0.8, x+0.8, 3.0, z+0.8, SHADOW, false);
+      g.spike(x, 3.0, z, x, 5.0, z, 0.8, ORGANIC);
+  }
+
+  return g.build();
+}
+
+// ── Liquid Shadow Droplets (Particles) ────────────────────────────────
+const FC=400;
+let flameBuf,flameData=new Float32Array(FC*7);
+const fS=Array.from({length:FC},()=>({
+  x:(Math.random()-.5)*15, y:(Math.random()*12), z:(Math.random()-.5)*15,
+  vy:.5+Math.random()*1.5, vx:(Math.random()-.5)*.5, vz:(Math.random()-.5)*.5,
+  life:Math.random(), spd:.2+Math.random()*.4, isMagenta:Math.random()>.7, sz:15+Math.random()*25
+}));
+
+function updateShadows(){
+  fS.forEach((f,i)=>{
+    f.life+=dt*f.spd; f.y+=f.vy*dt; f.x+=f.vx*dt; f.z+=f.vz*dt;
+    if(f.life>1||f.y>12){f.x=(Math.random()-.5)*15;f.y=0;f.z=(Math.random()-.5)*15;f.vy=.5+Math.random()*1.5;f.vx=(Math.random()-.5)*.5;f.vz=(Math.random()-.5)*.5;f.life=0;}
+    const lf=f.life<.15?f.life/.15:f.life>.7?(1-f.life)/.3:1;
+    const o=i*7;flameData[o]=f.x;flameData[o+1]=f.y;flameData[o+2]=f.z;flameData[o+3]=f.sz*(1+lf*.3);
+    
+    if(f.isMagenta){
+      flameData[o+4]=0.8*lf; flameData[o+5]=0.1*lf; flameData[o+6]=0.9*lf; // Glowing Purple/Magenta
+    } else {
+      flameData[o+4]=0.01*lf; flameData[o+5]=0.01*lf; flameData[o+6]=0.02*lf; // Pitch Black Ink
+    }
+  });
+  gl.bindBuffer(gl.ARRAY_BUFFER,flameBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,flameData,gl.DYNAMIC_DRAW);
+}
+
+// ── 2D FX Overlays ────────────────────────────────────────────────────
+const SLASHES=Array.from({length:40},()=>({ 
+  x0:Math.random(),y0:Math.random(),angle:(Math.random()-.5)*Math.PI*2,
+  len:.8+Math.random()*1.5,width:3.0+Math.random()*10,speed:5+Math.random()*8,
+  progress:-(Math.random()*.8),
+  col: Math.random()>.5?[20,0,30] : [150,20,200], // Black and Magenta shadow strikes
+  bright:.8+Math.random()*.5
+}));
+
+// ── GL objects ────────────────────────────────────────────────────────
+let shrineGeo,skyVB;
+function buildGL(){
+  shrineGeo=buildChimera();
+  skyVB=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,skyVB);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,1,1,-1,1]),gl.STATIC_DRAW);
+  flameBuf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,flameBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,flameData,gl.DYNAMIC_DRAW);
+}
+
+const P4=m4(),V4=m4(),MVP=m4(),MOD=m4();
+
+function renderSkyGL(alpha){
+  if(!skyVB)return;
+  gl.useProgram(skyProg);
+  gl.disable(gl.DEPTH_TEST);
+  gl.bindBuffer(gl.ARRAY_BUFFER,skyVB);
+  const ap2=gl.getAttribLocation(skyProg,'aP');
+  gl.enableVertexAttribArray(ap2);gl.vertexAttribPointer(ap2,2,gl.FLOAT,false,8,0);
+  gl.uniform1f(gl.getUniformLocation(skyProg,'uT'),domainT);
+  gl.drawArrays(gl.TRIANGLE_FAN,0,4);
+  gl.enable(gl.DEPTH_TEST);
+}
+
+function renderDomain(alpha){
+  if(!shrineGeo)return;
+  
+  updateShadows();
+
+  // CONTINUOUS ORBIT CAMERA AROUND THE CHIMERA TREE
+  const ang = domainT * 0.4; // Speed of the rotation
+  const cr = 14, ch = 5.0; // Radius and Height
+  const eye = [Math.sin(ang)*cr, ch, Math.cos(ang)*cr];
+  lookAt(V4, eye, [0, 4.0, 0], [0, 1, 0]); // Look at the center of the spine
+  persp(P4,.60,W/H,.1,200);
+
+  // Buffer bindings
+  const st=36;
+  gl.bindBuffer(gl.ARRAY_BUFFER,shrineGeo.vb);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,shrineGeo.ib);
+  const ap=gl.getAttribLocation(prog,'aPos'),an=gl.getAttribLocation(prog,'aNorm'),ac=gl.getAttribLocation(prog,'aCol');
+  gl.enableVertexAttribArray(ap);gl.vertexAttribPointer(ap,3,gl.FLOAT,false,st,0);
+  gl.enableVertexAttribArray(an);gl.vertexAttribPointer(an,3,gl.FLOAT,false,st,12);
+  gl.enableVertexAttribArray(ac);gl.vertexAttribPointer(ac,3,gl.FLOAT,false,st,24);
+  gl.enable(gl.DEPTH_TEST);
+
+  // RENDERING THE ORGANISM
+  gl.useProgram(prog);
+  ident(MOD);
+  mul(MVP,P4,V4); mul(MVP,MVP,MOD);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uMVP'),false,MVP);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uModel'),false,MOD);
+  gl.uniform3fv(gl.getUniformLocation(prog,'uLP'),[0, 18, 0]); // Light from straight above
+  gl.uniform3fv(gl.getUniformLocation(prog,'uLC'),[0.7, 0.1, 1.0]); // Magenta Light
+  gl.uniform3fv(gl.getUniformLocation(prog,'uAmb'),[.05, .01, .1]); // Dark purple ambient
+  gl.uniform1f(gl.getUniformLocation(prog,'uAlpha'),alpha);
+  gl.drawElements(gl.TRIANGLES,shrineGeo.cnt,gl.UNSIGNED_SHORT,0);
+
+  // RENDERING THE INK DROPLETS
+  gl.useProgram(pProg);
+  gl.uniformMatrix4fv(gl.getUniformLocation(pProg,'uVP'),false,mul(m4(),P4,V4));
+  gl.uniformMatrix4fv(gl.getUniformLocation(pProg,'uModel'),false,MOD);
+  gl.bindBuffer(gl.ARRAY_BUFFER,flameBuf);
+  const pp=gl.getAttribLocation(pProg,'aPos'),ps=gl.getAttribLocation(pProg,'aSz'),pc=gl.getAttribLocation(pProg,'aCol');
+  gl.enableVertexAttribArray(pp);gl.vertexAttribPointer(pp,3,gl.FLOAT,false,28,0);
+  gl.enableVertexAttribArray(ps);gl.vertexAttribPointer(ps,1,gl.FLOAT,false,28,12);
+  gl.enableVertexAttribArray(pc);gl.vertexAttribPointer(pc,3,gl.FLOAT,false,28,16);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);
+  gl.drawArrays(gl.POINTS,0,FC);
+  gl.depthMask(true);gl.disable(gl.BLEND);
+}
+
+// ── 2D FX ─────────────────────────────────────────────────────────────
+function drawSky(a){
+  const vg=X.createLinearGradient(0,0,0,H*.4);
+  vg.addColorStop(0,`rgba(0,0,0,${a})`);
+  vg.addColorStop(.6,`rgba(20,0,40,${a*.4})`);
+  vg.addColorStop(1,'rgba(0,0,0,0)');
+  X.fillStyle=vg;X.fillRect(0,0,W,H*.4);
+
+  // Expanding shadow pool effect during intro
+  if(a > 0 && a < 1) {
+    X.fillStyle = `rgba(0,0,0,${a})`;
+    X.beginPath();
+    X.arc(W/2, H, W * (1-a) * 1.5, 0, Math.PI*2);
+    X.fill();
+  }
+}
+
+function drawSlashBurst(amt){
+  SLASHES.forEach(s=>{
+    s.progress+=dt*s.speed;
+    if(s.progress>1.5){s.progress=-(Math.random()*.2);s.x0=Math.random();s.y0=Math.random();s.angle=(Math.random()-.5)*Math.PI*2;s.len=.6+Math.random()*1.2;}
+    if(s.progress<0)return;
+    const p=Math.min(s.progress,1),diag=Math.sqrt(W*W+H*H);
+    const tip=p*s.len*diag,tail=Math.max(0,tip-s.len*diag*.4);
+    const tx=s.x0*W+Math.cos(s.angle)*tip,ty=s.y0*H+Math.sin(s.angle)*tip;
+    const bx=s.x0*W+Math.cos(s.angle)*tail,by=s.y0*H+Math.sin(s.angle)*tail;
+    if(!isFinite(tx)||!isFinite(ty))return;
+    const fade=p>.7?(1-p)/.3:1,a=fade*s.bright*amt;
+    const [r,g,b]=s.col;
+    
+    const sg=X.createLinearGradient(bx,by,tx,ty);
+    sg.addColorStop(0,`rgba(${r},${g},${b},0)`);
+    sg.addColorStop(.5,`rgba(${r},${g},${b},${a})`);
+    sg.addColorStop(1,`rgba(${r},${g},${b},${a})`);
+    
+    X.beginPath();X.moveTo(bx,by);X.lineTo(tx,ty);X.strokeStyle=sg;X.lineWidth=s.width*(1+p*2);X.stroke();
+  });
+}
+
+// ── Render loop ───────────────────────────────────────────────────────
+function render(now){
+  requestAnimationFrame(render);
+  dt=Math.min((now-(lastTime||now))/1000,.033);lastTime=now;t+=dt;
+
+  const isDomain=window.currentDomain==='chimera';
+
+  if(isDomain&&prev==='neutral'){
+    phase='slash';phaseT=0;domainT=0;flash=1.0;shake=5.0;
+    setTimeout(()=>{flash=.7;shake=3.0;},100);setTimeout(()=>{flash=.4;},200);
+    SLASHES.forEach((s,i)=>{s.progress=-(i/SLASHES.length)*.3;});
+  }
+  if(!isDomain&&prev==='chimera'){phase='fadeout';phaseT=0;}
+  prev=window.currentDomain;
+
+  if(phase==='slash'){
+    phaseT+=dt;shake=Math.max(shake,1.5+Math.sin(phaseT*25)*.6+Math.random()*1.2);
+    if(phaseT>2.0){phase='settle';phaseT=0;flash=.5;shake=3.5;} 
+  }else if(phase==='settle'){
+    phaseT+=dt;domainT+=dt;if(phaseT>.8){phase='domain';phaseT=0;shake=0;}
+  }else if(phase==='domain'){
+    domainT+=dt;shake=0;
+  }else if(phase==='fadeout'){
+    phaseT+=dt;domainT+=dt;if(phaseT>1.2)phase='idle';
+  }
+
+  // GL Rendering
+  gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const sa=phase==='domain'?1:phase==='settle'?Math.min(phaseT/.8,1):phase==='fadeout'?1-Math.min(phaseT/1.2,1):0;
+  if(sa>0.01){renderSkyGL(sa);renderDomain(sa);}
+
+  // 2D FX Layer
+  X.clearRect(0,0,W,H);
+  if(phase==='slash'){
+    const a=Math.min(phaseT/.2,1);
+    X.fillStyle=`rgba(10,0,20,${a})`;X.fillRect(0,0,W,H); // Purple/Black flash background
+    const b=X.createRadialGradient(W*.5,H*.5,0,W*.5,H*.5,Math.max(W,H)*.7);
+    b.addColorStop(0,`rgba(150,0,255,${a*.5})`);b.addColorStop(.2,`rgba(80,0,150,${a*.3})`);b.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=b;X.fillRect(0,0,W,H);drawSlashBurst(a);
+  }else if(phase==='settle'){
+    const p=Math.min(phaseT/.8,1),e=1-Math.pow(1-p,3);
+    drawSky(e);drawSlashBurst(1-e);
+  }else if(phase==='domain'){
+    drawSky(1);
+  }else if(phase==='fadeout'){
+    const a=1-Math.min(phaseT/1.2,1);drawSky(a);
+  }
+
+  // UI Updates
+  if(flash>.004){flashEl.style.opacity=flash;flash*=.80;}else{flashEl.style.opacity=0;flash=0;}
+
+  if(shake>.01){
+    const jx=(Math.random()-.5)*shake*45,jy=(Math.random()-.5)*shake*40,jr=(Math.random()-.5)*shake*1.0;
+    glC.style.transform=fxC.style.transform=`translate(${jx}px,${jy}px) rotate(${jr}deg)`;shake*=.85;
+  }else{glC.style.transform=fxC.style.transform='';shake=0;}
+
+  videoEl.classList.toggle('active',phase==='domain');
+  titleEl.style.opacity=phase==='domain'&&domainT>.8?Math.min(1,(domainT-.8)/.8):0;
+}
+
+resize();buildGL();requestAnimationFrame(render);
+</script>
+</body>
+</html>
