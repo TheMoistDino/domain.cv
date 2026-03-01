@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain Expansion CV</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: sans-serif; }
+        
+        /* The 3D Canvas goes on top */
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10; }
+        
+        /* The actual webcam feed goes behind the 3D canvas */
+        #webcam-video {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            object-fit: cover; z-index: 1; transform: scaleX(-1); /* Mirror the video */
+        }
+
+        /* UI Overlay */
+        #ui-layer { position: absolute; top: 20px; left: 20px; z-index: 20; text-shadow: 2px 2px 4px #000; }
+        #debug-skeleton { position: absolute; bottom: 20px; left: 20px; width: 240px; z-index: 20; border: 2px solid #fff; }
+    </style>
+</head>
+<body>
+    <video id="webcam-video" autoplay playsinline muted></video>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <h1>Domain: <span id="domain-name-display">NEUTRAL</span></h1>
+    </div>
+    <img id="debug-skeleton" src="" alt="Backend Skeleton Feed" />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script src="js/scene.js"></script> <script src="js/main.js"></script>  </body>
+</html>

@@ -126,6 +126,90 @@ class GestureRecognizer:
             return True
 
         return False
+    
+    @staticmethod
+    def detect_idle_death_gamble(hand1, hand2):
+        """
+        Hakari's Domain Expansion (Idle Death Gamble):
+        1. Hands are separated.
+        2. Middle, Ring, and Pinky fingers are extended.
+        3. Thumb and Index fingertips are touching (forming a ring).
+        """
+        lm1 = hand1['landmarks']
+        lm2 = hand2['landmarks']
+        wrist1, wrist2 = lm1[0], lm2[0]
+
+        hand_size = math.hypot(lm1[9][0] - wrist1[0], lm1[9][1] - wrist1[1]) 
+        wrist_dist = math.hypot(wrist1[0] - wrist2[0], wrist1[1] - wrist2[1])
+
+        # 1. Enforce Separation (Hands shouldn't be fully clasped)
+        if wrist_dist < (hand_size * 0.8): 
+            return False
+
+        # Helper function to check the specific Hakari hand state
+        def is_hakari_hand(lm, wrist):
+            # Check if Middle, Ring, and Pinky are extended
+            mid_ext = GestureRecognizer.is_finger_extended(lm[12], lm[10], wrist)
+            ring_ext = GestureRecognizer.is_finger_extended(lm[16], lm[14], wrist)
+            pinky_ext = GestureRecognizer.is_finger_extended(lm[20], lm[18], wrist)
+            
+            if not (mid_ext and ring_ext and pinky_ext):
+                return False
+                
+            # Check the Ring: Distance between Thumb tip (4) and Index tip (8)
+            thumb_tip, index_tip = lm[4], lm[8]
+            ring_dist = math.hypot(thumb_tip[0] - index_tip[0], thumb_tip[1] - index_tip[1])
+            
+            # Local hand size for proportion
+            local_hand_size = math.hypot(lm[9][0] - wrist[0], lm[9][1] - wrist[1])
+            
+            # If the distance between thumb and index is very small, they form a ring
+            if ring_dist < (local_hand_size * 0.4):
+                return True
+                
+            return False
+
+        # 2. Both hands must be making the formation
+        if is_hakari_hand(lm1, wrist1) and is_hakari_hand(lm2, wrist2):
+            return True
+
+        return False
+    
+    @staticmethod
+    def detect_chimera_shadow_garden(detected_hands):
+        """
+        Lore-Accurate Pivot: Megumi's Divine Dog (Kon) Sign.
+        Looks for both hands making the "Rock On" sign 
+        (Index and Pinky extended, Middle and Ring curled).
+        """
+        # We need exactly two hands for this
+        if len(detected_hands) < 2:
+            return False
+
+        lm1, lm2 = detected_hands[0]['landmarks'], detected_hands[1]['landmarks']
+        wrist1, wrist2 = lm1[0], lm2[0]
+
+        hand_size = math.hypot(lm1[9][0] - wrist1[0], lm1[9][1] - wrist1[1])
+        wrist_dist = math.hypot(wrist1[0] - wrist2[0], wrist1[1] - wrist2[1])
+
+        # Hands should be in the same general area (summoning pose in front of chest)
+        # We give a generous threshold so you don't have to perfectly touch them
+        if wrist_dist > (hand_size * 3.5):
+            return False
+
+        # Check the finger formations on BOTH hands
+        for lm in [lm1, lm2]:
+            wrist = lm[0]
+            index_ext = GestureRecognizer.is_finger_extended(lm[8], lm[6], wrist)
+            mid_ext = GestureRecognizer.is_finger_extended(lm[12], lm[10], wrist)
+            ring_ext = GestureRecognizer.is_finger_extended(lm[16], lm[14], wrist)
+            pinky_ext = GestureRecognizer.is_finger_extended(lm[20], lm[18], wrist)
+
+            # The Kon check: Index & Pinky UP, Middle & Ring DOWN
+            if not (index_ext and pinky_ext and not mid_ext and not ring_ext):
+                return False
+
+        return True
 
     def get_domain_expansion(self, detected_hands):
         if not detected_hands:
@@ -137,6 +221,12 @@ class GestureRecognizer:
                 return "malevolent_shrine"
             if self.detect_authentic_mutual_love(detected_hands[0], detected_hands[1]):
                 return "authentic_mutual_love"
+            if self.detect_idle_death_gamble(detected_hands[0], detected_hands[1]):
+                return "idle_death_gamble"
+                
+        # Run Megumi's separately since it takes the whole list now
+        if self.detect_chimera_shadow_garden(detected_hands):
+            return "chimera_shadow_garden"
 
         # Check for one-handed domains
         for hand in detected_hands:
