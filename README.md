@@ -13,7 +13,11 @@ domain-expansion-cv/
 ├── frontend/
 │   ├── index.html             (The main web app interface)
 │   ├── style.css              (Jujutsu Kaisen themed styling and layout)
-│   ├── script.js              (Handles webcam capture and sending frames to backend)
-│   └── assets/                (Your Domain Expansion GIFs, sounds, and neutral images)
+│   ├── js/
+│   │   ├── main.js            (Handles webcam capture, WebSocket connection, and UI state)
+│   │   └── scene.js           (Handles Three.js initialization, lighting, and 3D rendering)
+│   └── assets/                
+│       ├── models/            (Store your .glb or .gltf 3D models here)
+│       └── textures/          (Images for 3D particles or background materials)
 ├── .gitignore                 (Ignore __pycache__, virtual environments, etc.)
 └── README.md                  (Project setup and run instructions)
