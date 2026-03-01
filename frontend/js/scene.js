@@ -43,6 +43,12 @@ window.updateDomain = function(newDomain) {
     currentDomain = newDomain;
     console.log("Visuals switching to:", currentDomain);
 
+    // Reset all models and backgrounds
+    if (shrineModel) shrineModel.visible = false;
+    if (dogModel) dogModel.visible = false;
+    if (mahoragaWheel) mahoragaWheel.visible = false; // If implemented
+    scene.background = null;
+
     // Teammate's Playground: Change colors, load specific models, or trigger animations here
     switch(currentDomain) {
         case "infinite_void":

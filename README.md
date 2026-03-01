@@ -63,10 +63,10 @@ domain-expansion-cv/
 
 ## 🚀 Getting Started
 ### Backend Setup
-1. Create a virtual environment: python -m venv .venv
-2. Install dependencies: pip install -r backend/requirements.txt
-3. Start the server: uvicorn backend.app:app --reload
+1. Create a virtual environment: `python -m venv .venv`
+2. Install dependencies: `pip install -r backend/requirements.txt`
+3. Start the server: `uvicorn backend.app:app --reload`
 
 ### Frontend Setup
-1. Simply open frontend/index.html in a modern web browser.
-2. Ensure your webcam is enabled and the WebSocket connection to localhost:8000 is active.
+1. Simply open `frontend/index.html` in a modern web browser.
+2. Ensure your webcam is enabled and the WebSocket connection to `localhost:8000` is active.

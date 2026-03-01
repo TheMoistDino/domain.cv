@@ -362,17 +362,15 @@ class GestureRecognizer:
         return "neutral"
     
     def get_domain_expansion(self, detected_hands):
-        """
-        The new gatekeeper. Applies temporal smoothing to prevent flickering.
-        """
         # 1. Get the raw detection for this exact millisecond
         raw_domain = self._get_raw_domain(detected_hands)
 
         # 2. Smoothing Logic
-        if raw_domain == self.candidate_domain:
+        if raw_domain == self.candidate_domain and raw_domain != "neutral":
             # The model is seeing the same thing it saw last frame.
             # Has it been held long enough?
             time_held = time.time() - self.candidate_start_time
+            progress = min(1.0, time_held / self.hold_time) # 0.0 to 1.0
             
             if time_held >= self.hold_time:
                 # Lock it in!
@@ -381,6 +379,7 @@ class GestureRecognizer:
             # The gesture changed (or flickered). Reset the stopwatch.
             self.candidate_domain = raw_domain
             self.candidate_start_time = time.time()
+            progress = 0.0
 
         # Always return the stable domain to the frontend
-        return self.stable_domain
+        return self.stable_domain, progress

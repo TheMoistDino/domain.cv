@@ -49,8 +49,8 @@ async def websocket_endpoint(websocket: WebSocket):
             # 3. Process the frame to get landmarks and draw the skeleton
             processed_frame, detected_hands = tracker.process_frame(frame, draw=True)
             
-            # 4. Determine the active Domain Expansion
-            domain = recognizer.get_domain_expansion(detected_hands)
+            # 4. Determine the active Domain Expansion and charge progress
+            domain, progress = recognizer.get_domain_expansion(detected_hands)
             
             # 5. Encode the processed frame back to Base64 to display the skeleton on the UI
             _, buffer = cv2.imencode('.jpg', processed_frame)
@@ -59,6 +59,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # 6. Send the domain string and the annotated video frame back to the frontend
             await websocket.send_text(json.dumps({
                 "domain": domain,
+                "progress": progress,
                 "image": f"data:image/jpeg;base64,{encoded_frame}"
             }))
             

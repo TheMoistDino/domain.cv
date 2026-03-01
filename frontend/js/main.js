@@ -4,6 +4,10 @@ const hiddenCanvas = document.createElement('canvas');
 const ctx = hiddenCanvas.getContext('2d');
 const debugImage = document.getElementById('debug-skeleton'); // Optional: to see MediaPipe's output
 const domainText = document.getElementById('domain-name-display');
+const resetBtn = document.getElementById('reset-btn');
+
+// Initialize the display
+if (domainText) domainText.innerText = "NEUTRAL";
 
 // --- WebSocket Setup ---
 const ws = new WebSocket("ws://localhost:8000/ws");
@@ -36,22 +40,57 @@ ws.onopen = () => {
     }, 100); 
 };
 
+// --- Reset Functionality ---
+function triggerReset() {
+    console.log("Environment Reset Triggered");
+    
+    // 1. Force the UI back to Neutral
+    if (domainText) domainText.innerText = "NEUTRAL";
+    
+    // 2. Clear the progress bar
+    const meterFill = document.getElementById('energy-meter-fill');
+    if (meterFill) meterFill.style.width = "0%";
+
+    // 3. Force Three.js back to Neutral
+    if (window.updateDomain) {
+        window.updateDomain("neutral");
+    }
+}
+
+// Button Click Listener
+resetBtn.addEventListener('click', triggerReset);
+
+// Optional: Keyboard shortcut 'R' for the demo video
+window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'r') triggerReset();
+});
+
 // --- Receive Data from Python ---
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     
-    // 1. Update the text UI (optional)
+    // 1. Update UI Text (This replaces the content, preventing overlap)
     if (domainText) {
-        domainText.innerText = data.domain.toUpperCase().replace(/_/g, ' ');
+        const cleanName = data.domain.toUpperCase().replace(/_/g, ' ');
+        domainText.innerText = cleanName;
     }
 
-    // 2. Update the debug image with the MediaPipe skeleton (optional)
+    // 2. Update Cursed Energy Meter
+    const meterFill = document.getElementById('energy-meter-fill');
+    if (meterFill) {
+        // progress is 0.0 to 1.0 from the backend
+        meterFill.style.width = (data.progress * 100) + "%";
+        
+        // Make it glow brighter as it fills
+        meterFill.style.opacity = 0.5 + (data.progress * 0.5);
+    }
+
+    // 3. Update Debug Image
     if (debugImage) {
         debugImage.src = data.image;
     }
 
-    // 3. THE MAGIC LINK: Tell Three.js (scene.js) to change the visuals!
-    // This calls the function we exposed in scene.js
+    // 4. Trigger Three.js
     if (window.updateDomain) {
         window.updateDomain(data.domain);
     }
