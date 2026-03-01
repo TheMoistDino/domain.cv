@@ -1,9 +1,18 @@
 import math
+import time
 
 class GestureRecognizer:
-    def __init__(self):
-        # We can store any state or history here if we want to add smoothing later
-        pass
+    def __init__(self, hold_time=0.5):
+        """
+        hold_time: How long (in seconds) a gesture must be held before it triggers.
+        0.5 seconds is usually the sweet spot for a hackathon demo.
+        """
+        self.hold_time = hold_time
+        
+        # State trackers for temporal smoothing
+        self.stable_domain = "neutral"       # What is currently displaying on screen
+        self.candidate_domain = "neutral"    # What the current frame thinks it sees
+        self.candidate_start_time = time.time()
 
     @staticmethod
     def is_finger_extended(tip, pip, wrist):
@@ -210,27 +219,127 @@ class GestureRecognizer:
                 return False
 
         return True
+    
+    @staticmethod
+    def detect_self_embodiment_of_perfection(hand1, hand2):
+        """
+        Mahito's Self-Embodiment of Perfection:
+        1. Hands form a hollow sphere/cage.
+        2. Wrists/palms are separated.
+        3. All five fingertips (Thumb, Index, Middle, Ring, Pinky) are touching their counterparts.
+        """
+        lm1 = hand1['landmarks']
+        lm2 = hand2['landmarks']
+        wrist1, wrist2 = lm1[0], lm2[0]
 
-    def get_domain_expansion(self, detected_hands):
+        hand_size = math.hypot(lm1[9][0] - wrist1[0], lm1[9][1] - wrist1[1])
+        wrist_dist = math.hypot(wrist1[0] - wrist2[0], wrist1[1] - wrist2[1])
+
+        # 1. Enforce palm separation (Creating the hollow space of the "prison")
+        # If wrists are too close, it might accidentally trigger during a clap or prayer
+        if wrist_dist < (hand_size * 1.2):
+            return False
+
+        # 2. Check if the fingertips are touching
+        # We check the distance between the corresponding tips on both hands.
+        tips = [4, 8, 12, 16, 20] # Thumb, Index, Middle, Ring, Pinky
+        
+        for tip in tips:
+            tip_dist = math.hypot(lm1[tip][0] - lm2[tip][0], lm1[tip][1] - lm2[tip][1])
+            
+            # If any pair of fingertips is too far apart, the cage is broken
+            if tip_dist > (hand_size * 0.9): # Generous threshold for hackathon lighting
+                return False
+
+        # 3. Ensure the hands aren't just closed fists near each other
+        # We check if the middle finger is at least somewhat extended away from the wrist
+        mid_to_wrist = math.hypot(lm1[12][0] - wrist1[0], lm1[12][1] - wrist1[1])
+        if mid_to_wrist < hand_size: 
+            return False 
+
+        return True
+    
+    @staticmethod
+    def detect_deadly_sentencing(hand):
+        """
+        Higuruma's Deadly Sentencing:
+        MediaPipe can't see the physical mallet, so we look for the hand HOLDING it.
+        We look for a strict, tight fist (all 4 fingers curled, thumb wrapped tight).
+        """
+        lm = hand['landmarks']
+        wrist = lm[0]
+
+        # 1. Check if all 4 main fingers are curled around the handle
+        index_ext = GestureRecognizer.is_finger_extended(lm[8], lm[6], wrist)
+        middle_ext = GestureRecognizer.is_finger_extended(lm[12], lm[10], wrist)
+        ring_ext = GestureRecognizer.is_finger_extended(lm[16], lm[14], wrist)
+        pinky_ext = GestureRecognizer.is_finger_extended(lm[20], lm[18], wrist)
+
+        if index_ext or middle_ext or ring_ext or pinky_ext:
+            return False
+
+        # 2. Check the thumb to ensure it's a tight grip
+        # When holding a handle, the thumb tip (4) wraps over the index knuckle (5)
+        thumb_tip = lm[4]
+        index_mcp = lm[5]
+        
+        hand_size = math.hypot(lm[9][0] - wrist[0], lm[9][1] - wrist[1])
+        thumb_dist = math.hypot(thumb_tip[0] - index_mcp[0], thumb_tip[1] - index_mcp[1])
+
+        # If the thumb is sticking straight up or out, it's not a tight mallet grip
+        if thumb_dist > (hand_size * 1.2): 
+            return False
+
+        return True
+
+    def _get_raw_domain(self, detected_hands):
         if not detected_hands:
             return "neutral"
 
-        # Check for two-handed domains first
+        # 1. Megumi's Check (Handles the whole list)
+        if self.detect_chimera_shadow_garden(detected_hands):
+            return "chimera_shadow_garden"
+
+        # 2. Check for the other two-handed domains
         if len(detected_hands) >= 2:
+            if self.detect_self_embodiment_of_perfection(detected_hands[0], detected_hands[1]):
+                return "self_embodiment_of_perfection"
             if self.detect_malevolent_shrine(detected_hands[0], detected_hands[1]):
                 return "malevolent_shrine"
             if self.detect_authentic_mutual_love(detected_hands[0], detected_hands[1]):
                 return "authentic_mutual_love"
             if self.detect_idle_death_gamble(detected_hands[0], detected_hands[1]):
                 return "idle_death_gamble"
-                
-        # Run Megumi's separately since it takes the whole list now
-        if self.detect_chimera_shadow_garden(detected_hands):
-            return "chimera_shadow_garden"
 
-        # Check for one-handed domains
+        # 3. Check for one-handed domains
         for hand in detected_hands:
             if self.detect_infinite_void(hand):
                 return "infinite_void"
+            if self.detect_deadly_sentencing(hand):
+                return "deadly_sentencing"
 
         return "neutral"
+    
+    def get_domain_expansion(self, detected_hands):
+        """
+        The new gatekeeper. Applies temporal smoothing to prevent flickering.
+        """
+        # 1. Get the raw detection for this exact millisecond
+        raw_domain = self._get_raw_domain(detected_hands)
+
+        # 2. Smoothing Logic
+        if raw_domain == self.candidate_domain:
+            # The model is seeing the same thing it saw last frame.
+            # Has it been held long enough?
+            time_held = time.time() - self.candidate_start_time
+            
+            if time_held >= self.hold_time:
+                # Lock it in!
+                self.stable_domain = raw_domain
+        else:
+            # The gesture changed (or flickered). Reset the stopwatch.
+            self.candidate_domain = raw_domain
+            self.candidate_start_time = time.time()
+
+        # Always return the stable domain to the frontend
+        return self.stable_domain
