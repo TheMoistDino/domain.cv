@@ -2,59 +2,59 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Domain Expansion - Server Test</title>
+    <title>test_domain.cv</title>
     <style>
         body { font-family: sans-serif; text-align: center; background: #1a1a1a; color: white; }
         img { border: 2px solid #ff0055; border-radius: 8px; margin-top: 20px; max-width: 100%; }
         h1 { color: #00ffcc; }
+        .data-readout { color: #aaa; font-family: monospace; margin-top: 10px; }
     </style>
 </head>
 <body>
     <h2>Detected Domain: <span id="domain-output">Connecting...</span></h2>
-    
-    <video id="video" autoplay style="display:none;"></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="data-readout">Charge Progress: <span id="progress-output">0.0</span></div>
     
     <img id="result-image" src="" alt="Waiting for server..." />
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
         const resultImage = document.getElementById('result-image');
         const domainOutput = document.getElementById('domain-output');
+        const progressOutput = document.getElementById('progress-output');
 
         // Connect to your FastAPI WebSocket
         const ws = new WebSocket("ws://localhost:8000/ws");
 
-        // Request webcam access
-        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-            video.srcObject = stream;
-        }).catch(err => console.error("Webcam error:", err));
-
         ws.onopen = () => {
             domainOutput.innerText = "Neutral (Connected)";
-            
-            // Send a frame every 100ms (10 FPS) to keep the server from crashing under load
-            setInterval(() => {
-                if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
-                    // Convert frame to Base64 and send
-                    const base64Data = canvas.toDataURL('image/jpeg', 0.5);
-                    ws.send(base64Data);
-                }
-            }, 100); 
+            console.log("Successfully connected to the backend!");
         };
 
-        // Handle the incoming data from FastAPI
+        // Handle the incoming data from FastAPI passively
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            domainOutput.innerText = data.domain.toUpperCase().replace('_', ' ');
-            resultImage.src = data.image; // Updates the image with the MediaPipe skeleton
+            
+            // Update the text
+            domainOutput.innerText = data.domain.toUpperCase().replace(/_/g, ' ');
+            
+            // Check if progress exists (in case you are testing early backend code)
+            if (data.progress !== undefined) {
+                progressOutput.innerText = data.progress.toFixed(2);
+            }
+
+            // Update the image with the MediaPipe skeleton
+            if (data.image) {
+                resultImage.src = data.image; 
+            }
         };
+
+        ws.onerror = (err) => {
+            console.error("WebSocket error:", err);
+            domainOutput.innerText = "Connection Error (See Console)";
+        };
+        
+        ws.onclose = () => {
+            domainOutput.innerText = "Disconnected from Server";
+        }
     </script>
 </body>
 </html>

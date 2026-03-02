@@ -14,6 +14,10 @@ class GestureRecognizer:
         self.candidate_domain = "neutral"    # What the current frame thinks it sees
         self.candidate_start_time = time.time()
 
+        # --- TIMER ---
+        self.last_trigger_time = 0  # Stores the timestamp of when a domain was locked in
+        self.timeout_duration = 10.0 # 10 seconds reset
+
     @staticmethod
     def is_finger_extended(tip, pip, wrist):
         """
@@ -367,19 +371,28 @@ class GestureRecognizer:
 
         # 2. Smoothing Logic
         if raw_domain == self.candidate_domain and raw_domain != "neutral":
-            # The model is seeing the same thing it saw last frame.
-            # Has it been held long enough?
             time_held = time.time() - self.candidate_start_time
-            progress = min(1.0, time_held / self.hold_time) # 0.0 to 1.0
+            progress = min(1.0, time_held / self.hold_time)
             
             if time_held >= self.hold_time:
-                # Lock it in!
-                self.stable_domain = raw_domain
+                # If we are locking in a NEW domain, update the reset timer
+                if self.stable_domain != raw_domain:
+                    self.stable_domain = raw_domain
+                    self.last_trigger_time = time.time() # START THE 10s CLOCK
         else:
-            # The gesture changed (or flickered). Reset the stopwatch.
+            # If the hands move or drop, reset the candidate (smoothing) stopwatch
             self.candidate_domain = raw_domain
             self.candidate_start_time = time.time()
             progress = 0.0
 
-        # Always return the stable domain to the frontend
+        # --- 3. AUTO-RESET TIMER LOGIC ---
+        # If a domain is currently active, check if the timeout has passed
+        if self.stable_domain != "neutral":
+            elapsed_since_trigger = time.time() - self.last_trigger_time
+            
+            if elapsed_since_trigger > self.timeout_duration:
+                # Force reset back to neutral after 10 seconds
+                self.stable_domain = "neutral"
+                print(f"Domain {self.stable_domain} timed out. Resetting.")
+
         return self.stable_domain, progress

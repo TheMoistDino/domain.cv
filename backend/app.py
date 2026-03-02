@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import base64
 import json
+import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,7 +12,6 @@ from vision.gesture_logic import GestureRecognizer
 
 app = FastAPI()
 
-# Allow CORS for local frontend testing
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,50 +20,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Instantiate our tracking and logic classes
 tracker = HandTracker()
 recognizer = GestureRecognizer()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("Client connected to WebSocket")
+    print("Client connected! Backend taking control of webcam...")
+    
+    # Backend natively captures the local webcam
+    cap = cv2.VideoCapture(0)
     
     try:
         while True:
-            # 1. Receive frame from frontend (Base64 encoded string)
-            data = await websocket.receive_text()
-            
-            # Strip the "data:image/jpeg;base64," header if the frontend sends it
-            if ',' in data:
-                data = data.split(',')[1]
-            
-            # 2. Decode Base64 string to a NumPy array, then to an OpenCV image
-            img_bytes = base64.b64decode(data)
-            np_arr = np.frombuffer(img_bytes, np.uint8)
-            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            
-            if frame is None:
+            ret, frame = cap.read()
+            if not ret:
+                await asyncio.sleep(0.03)
                 continue
 
-            # 3. Process the frame to get landmarks and draw the skeleton
+            # 1. Process the frame (Tracking & Drawing)
             processed_frame, detected_hands = tracker.process_frame(frame, draw=True)
             
-            # 4. Determine the active Domain Expansion and charge progress
+            # 2. Determine the active Domain Expansion
             domain, progress = recognizer.get_domain_expansion(detected_hands)
             
-            # 5. Encode the processed frame back to Base64 to display the skeleton on the UI
+            # 3. Encode the frame to Base64 to stream DOWN to the frontend
             _, buffer = cv2.imencode('.jpg', processed_frame)
             encoded_frame = base64.b64encode(buffer).decode('utf-8')
             
-            # 6. Send the domain string and the annotated video frame back to the frontend
+            # 4. Push the data to the frontend (No request needed from index.html)
             await websocket.send_text(json.dumps({
                 "domain": domain,
                 "progress": progress,
                 "image": f"data:image/jpeg;base64,{encoded_frame}"
             }))
             
+            # Yield to the event loop (~30 FPS limit)
+            await asyncio.sleep(0.03)
+            
     except WebSocketDisconnect:
         print("Client disconnected")
     except Exception as e:
         print(f"Error processing frame: {e}")
+    finally:
+        cap.release()

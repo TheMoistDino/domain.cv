@@ -1,7 +1,7 @@
 # Domain.cv 🤞✨
 **Real-time Domain Expansions powered by Computer Vision.**
 
-Domain.cv is an interactive web application that transforms users into Jujutsu Sorcerers. By leveraging advanced hand-tracking kinematics and real-time computer vision, the app detects iconic hand signs through a webcam and instantly triggers immersive 3D environments directly in the browser.
+Domain.cv is an interactive web application that transforms users into Jujutsu Sorcerers. By leveraging server-side hand-tracking and real-time computer vision, the app detects iconic hand signs and triggers immersive 3D/2D environments with physically correct lighting and cinematic transitions.
 
 ---
 
@@ -9,15 +9,16 @@ Domain.cv is an interactive web application that transforms users into Jujutsu S
 
 ### **Backend (Python & FastAPI)**
 The "brain" of the project, responsible for high-speed gesture recognition and kinematic analysis.
-* **Computer Vision:** Powered by **MediaPipe** to extract 21 3D hand landmarks at high fidelity.
-* **Kinematic Engine:** A custom-built `GestureRecognizer` that utilizes Euclidean distance, joint-angle dot products, and temporal smoothing to identify complex interlocked signs.
-* **Real-time Streaming:** Uses **WebSockets** via FastAPI to handle full-duplex communication between the webcam feed and the ML logic.
+* **Server-Side Rendering**: Uses OpenCV to capture the webcam feed directly in Python, ensuring MediaPipe has exclusive access to the hardware.
+* **Computer Vision**: Powered by MediaPipe to extract 21 3D hand landmarks and overlay skeleton tracking on the video frames.
+* **Kinematic Engine**: A custom-built GestureRecognizer with a 10-second auto-reset timer to prevent domain "locking" and ensure smooth resets.
+* **FastAPI WebSockets**: Streams processed Base64 video frames and domain state data to the frontend at high frequency.
 
-### **Frontend (Three.js & Web)**
+### **Frontend (Three.js & ES Modules)**
 The "soul" of the project, bringing the anime magic to life through 3D rendering.
-* **3D Rendering:** **Three.js** is used to create an immersive overlay over the user's camera feed.
-* **Dynamic Environments:** A modular scene controller swaps lighting, particle systems, and 3D assets based on the domain string received from the backend.
-* **Webcam Integration:** Captures and encodes video frames into Base64 for real-time processing.
+* **r160 Standardization**: All 3D domains (Mahito, Hakari, Yuta) utilize ACES Filmic Tone Mapping and sRGB Color Space for physically accurate lighting and 3D model rendering.
+* **Unified Cinematic Engine**: A modular system that manages WebGL contexts, 2D overlays, and "Instant Kill Switches" to clear memory when swapping domains.
+* **Enhanced UI**: Includes a Picture-in-Picture camera feed, an interactive Energy Meter, and a global "R" Key Reset with a visual notification popup.
 
 ---
 
@@ -50,13 +51,15 @@ domain-expansion-cv/
 │       └── gesture_logic.py   (Kinematic logic engine)
 ├── frontend/
 │   ├── index.html             (Web app interface)
-│   ├── style.css              (Themed styling)
-│   ├── js/
-│   │   ├── main.js            (Webcam & WebSocket state)
-│   │   └── scene.js           (Three.js rendering)
-│   └── assets/                
-│       ├── models/            (GLB/GLTF 3D models)
-│       └── textures/          (Particle/Background assets)
+│   ├── style.css              (Shared styles)
+│   └── js/
+│       ├── main.js            (Webcam & MasterController)
+│       ├── void_engine.js     (Logic for infinite void)
+│       ├── shrine_engine.js   (Logic for malevolent shrine)
+│       ├── perfection_engine.js   (Logic for self embodiment of perfection)
+│       ├── hakari_engine.js   (Logic for idle death gamble)
+│       ├── yuta_engine.js     (Logic for authentic mutual love)
+│       └── chimera_engine.js  (Logic for chimera shadow garden)
 └── README.md
 ```
 ---
@@ -68,5 +71,31 @@ domain-expansion-cv/
 3. Start the server: `uvicorn backend.app:app --reload`
 
 ### Frontend Setup
-1. Simply open `frontend/index.html` in a modern web browser.
-2. Ensure your webcam is enabled and the WebSocket connection to `localhost:8000` is active.
+1. **Critical**: Due to ES Module security (CORS), you must serve the frontend through a local server.
+2. Run `python -m http.server 5500` inside the frontend folder.
+3. Open `http://localhost:5500` in your browser.
+
+---
+
+## 🛠️ Troubleshooting for Judges
+If the webcam feed is black or the domain expansions are not triggering, please check the following:
+
+1. **Webcam Access & Privacy**
+* **Browser Permissions**: Ensure you have clicked "Allow" when the browser asks for camera access. If you missed it, click the Lock Icon 🔒 in the URL bar to reset permissions.
+* **Hardware Switch**: Some laptops have a physical privacy slider or a function key (like F8 or F10) that disables the camera at the hardware level. Ensure this is "On."
+* **Other Apps**: Ensure no other applications (Zoom, Teams, Discord) are currently using the webcam, as OpenCV requires exclusive hardware access.
+
+2. **Local Server Security (CORS)**
+* **Protocol Check**: Due to modern browser security for ES Modules, the 3D engines will not load if you open index.html directly as a file (e.g., file:///C:/...).
+* **Solution**: You must serve the frontend via a local server. Ensure you have run python -m http.server 5500 and are visiting http://localhost:5500.
+
+3. **WebSocket Connectivity**
+* **Backend Status**: Check your terminal to ensure the FastAPI server is running and displaying Uvicorn running on http://127.0.0.1:8000.
+* **Connection Display**: The UI should say "NEUTRAL" in the top-left status card. If it says "CONNECTING..." or "CONNECTION ERROR," the frontend cannot find the Python backend.
+
+4. **"Emergency Reset" Hotkey**
+* **The 'R' Key**: If a domain cinematic gets stuck or you want to clear the screen instantly to try a new gesture, press 'R' on your keyboard. This forces a global environment reset and triggers a visual confirmation popup.
+
+5. **Detection Tips**
+* **Lighting**: MediaPipe performs best in well-lit environments. If your room is very dark, the kinematic engine may struggle to identify finger-crossing or "fist vs. flat" states.
+* **Framing**: Keep your hands within the center of the frame. If your hands are too close to the lens, the tracking landmarks might "flicker," resetting the 0.5s hold-time required for activation.

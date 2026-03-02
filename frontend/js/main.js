@@ -1,101 +1,198 @@
 // --- Elements ---
-const video = document.getElementById('webcam-video');
-const hiddenCanvas = document.createElement('canvas');
-const ctx = hiddenCanvas.getContext('2d');
-const debugImage = document.getElementById('debug-skeleton'); // Optional: to see MediaPipe's output
+const inputVideoUI = document.getElementById('input_video');
 const domainText = document.getElementById('domain-name-display');
-const resetBtn = document.getElementById('reset-btn');
+const guideLayer = document.getElementById('guide-layer');
+const meterFill = document.getElementById('energy-meter-fill');
 
-// Initialize the display
-if (domainText) domainText.innerText = "NEUTRAL";
+// Cinematic Title Elements
+const titleEn = document.getElementById('title-en');
+const titleJp = document.getElementById('title-jp');
+const titleContainer = document.getElementById('domain-title');
+const flashEl = document.getElementById('flash');
 
-// --- WebSocket Setup ---
+// Initialize State
+window.currentDomain = 'neutral';
+let lastReceivedDomain = 'neutral'; // NEW: Decoupled backend state tracker
+
+// --- Connect to Backend ---
 const ws = new WebSocket("ws://localhost:8000/ws");
 
-// --- Webcam Setup ---
-navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
-    .then(stream => {
-        video.srcObject = stream;
-        video.play();
-    })
-    .catch(err => console.error("Webcam access denied or error:", err));
-
-// --- Communication Loop ---
 ws.onopen = () => {
-    console.log("Connected to Python Computer Vision Server!");
-    
-    // Send a frame to the server every 100ms (10 FPS)
-    setInterval(() => {
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            hiddenCanvas.width = video.videoWidth;
-            hiddenCanvas.height = video.videoHeight;
-            
-            // Draw current webcam frame to canvas
-            ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
-            
-            // Convert to Base64 and send to FastAPI
-            const base64Data = hiddenCanvas.toDataURL('image/jpeg', 0.5);
-            ws.send(base64Data);
-        }
-    }, 100); 
+    console.log("Connected to Python Server! Waiting for video stream...");
+    if (domainText) domainText.innerText = "NEUTRAL";
 };
 
-// --- Reset Functionality ---
-function triggerReset() {
-    console.log("Environment Reset Triggered");
-    
-    // 1. Force the UI back to Neutral
-    if (domainText) domainText.innerText = "NEUTRAL";
-    
-    // 2. Clear the progress bar
-    const meterFill = document.getElementById('energy-meter-fill');
-    if (meterFill) meterFill.style.width = "0%";
-
-    // 3. Force Three.js back to Neutral
-    if (window.updateDomain) {
-        window.updateDomain("neutral");
-    }
-}
-
-// Button Click Listener
-resetBtn.addEventListener('click', triggerReset);
-
-// Optional: Keyboard shortcut 'R' for the demo video
-window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() === 'r') triggerReset();
-});
-
-// --- Receive Data from Python ---
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    
-    // 1. Update UI Text (This replaces the content, preventing overlap)
-    if (domainText) {
-        const cleanName = data.domain.toUpperCase().replace(/_/g, ' ');
-        domainText.innerText = cleanName;
+    const newDomain = data.domain;
+
+    // 1. Render the backend's skeleton video stream directly to the UI
+    if (inputVideoUI && data.image) {
+        inputVideoUI.src = data.image;
     }
 
-    // 2. Update Cursed Energy Meter
-    const meterFill = document.getElementById('energy-meter-fill');
+    // 2. Hide UI guide squares if a cinematic is playing
+    if (newDomain === "neutral") {
+        if (guideLayer) guideLayer.style.display = 'flex';
+    } else {
+        if (guideLayer) guideLayer.style.display = 'none';
+    }
+
+    // 3. Update UI Text & Energy Meter
+    if (domainText) {
+        domainText.innerText = newDomain.toUpperCase().replace(/_/g, ' ');
+    }
     if (meterFill) {
-        // progress is 0.0 to 1.0 from the backend
         meterFill.style.width = (data.progress * 100) + "%";
-        
-        // Make it glow brighter as it fills
         meterFill.style.opacity = 0.5 + (data.progress * 0.5);
     }
 
-    // 3. Update Debug Image
-    if (debugImage) {
-        debugImage.src = data.image;
-    }
-
-    // 4. Trigger Three.js
-    if (window.updateDomain) {
-        window.updateDomain(data.domain);
+    // 4. FIX: Only trigger the Master Controller if the backend state ACTUALLY changes
+    if (lastReceivedDomain !== newDomain) {
+        lastReceivedDomain = newDomain;
+        triggerCinematic(newDomain);
     }
 };
 
 ws.onerror = (error) => {
     console.error("WebSocket Error:", error);
+    if (domainText) domainText.innerText = "CONNECTION ERROR";
 };
+
+// --- THE MASTER CONTROLLER ---
+function triggerCinematic(domain) {
+    // FIX: Completely reset CSS classes AND inline styles to prevent cross-contamination
+    if (titleContainer) {
+        titleContainer.className = ''; 
+        titleContainer.style.textShadow = '';
+        titleContainer.style.color = '';
+    }
+
+    switch(domain) {
+        case "infinite_void":
+            if (titleEn) titleEn.innerText = "INFINITE VOID";
+            if (titleJp) titleJp.innerText = "無量空処";
+            if (titleContainer) titleContainer.classList.add("theme-void");
+            if (flashEl) flashEl.style.background = "#fff";
+            
+            window.currentDomain = "void"; 
+            if (typeof VoidEngine !== 'undefined') VoidEngine.init();
+            break;
+            
+        case "malevolent_shrine":
+            if (titleEn) titleEn.innerText = "MALEVOLENT SHRINE";
+            if (titleJp) titleJp.innerText = "伏魔御廚子";
+            if (titleContainer) titleContainer.classList.add("theme-shrine");
+            if (flashEl) flashEl.style.background = "#ff0000";
+            
+            window.currentDomain = "shrine"; 
+            if (typeof ShrineEngine !== 'undefined') ShrineEngine.init();
+            break;
+            
+        case "chimera_shadow_garden":
+            if (titleEn) titleEn.innerText = "CHIMERA SHADOW GARDEN";
+            if (titleJp) titleJp.innerText = "嵌合暗翳庭";
+            if (titleContainer) titleContainer.classList.add("theme-chimera");
+            if (flashEl) flashEl.style.background = "#1a0033";
+            
+            window.currentDomain = "chimera"; 
+            if (typeof ChimeraEngine !== 'undefined') ChimeraEngine.init();
+            break;
+            
+        case "self_embodiment_of_perfection": 
+            if (titleEn) titleEn.innerText = "SELF-EMBODIMENT OF PERFECTION";
+            if (titleJp) titleJp.innerText = "自閉円頓裹";
+            if (titleContainer) {
+                // Mahito's Cyan Theme
+                titleContainer.style.textShadow = "0 0 20px rgba(0,150,255,.9), 0 0 50px rgba(0,80,200,.6)";
+                titleContainer.style.color = "rgba(255,255,255,.9)";
+            }
+            if (flashEl) flashEl.style.background = "#0a1118"; 
+            
+            window.currentDomain = "mahito"; 
+            if (window.PerfectionEngine) window.PerfectionEngine.init();
+            break;
+
+        case "idle_death_gamble":
+            if (titleEn) titleEn.innerText = "IDLE DEATH GAMBLE";
+            if (titleJp) titleJp.innerText = "坐殺博徒";
+            
+            if (titleContainer) {
+                // Hakari's Pink/Gold Theme
+                titleContainer.style.textShadow = "0 0 20px rgba(255,215,0,.9), 0 0 50px rgba(255,50,150,.8)";
+                titleContainer.style.color = "rgba(255,215,0,.9)";
+            }
+            if (flashEl) flashEl.style.background = "#fff"; 
+            
+            window.currentDomain = "hakari"; 
+            if (window.HakariEngine) window.HakariEngine.init();
+            break;
+
+        case "authentic_mutual_love":
+            if (titleEn) titleEn.innerText = "AUTHENTIC MUTUAL LOVE";
+            if (titleJp) titleJp.innerText = "真贋相愛";
+            
+            // Yuta's Ethereal Blue/Pink Theme
+            if (titleContainer) {
+                titleContainer.style.textShadow = "0 0 20px rgba(200,220,255,.8), 0 0 50px rgba(255,150,200,.6), 0 0 100px rgba(255,255,255,.4)";
+                titleContainer.style.color = "rgba(240,245,255,.9)";
+            }
+            if (flashEl) flashEl.style.background = "#050005"; // Pitch black fade-in
+            
+            window.currentDomain = "yuta"; 
+            if (window.YutaEngine) window.YutaEngine.init();
+            break;
+
+        default:
+            if (titleEn) titleEn.innerText = "";
+            if (titleJp) titleJp.innerText = "";
+            window.currentDomain = "neutral";
+            break;
+    }
+    
+    console.log("Cinematic Engine switched to:", window.currentDomain);
+}
+
+// --- HOTKEY RESET FUNCTIONALITY ---
+function triggerReset() {
+    console.log("Environment Reset Triggered via 'R' key");
+    
+    // 1. Force the backend tracker to 'neutral' so it doesn't ignore the next frame
+    lastReceivedDomain = 'neutral';
+    
+    // 2. Force the cinematic engines to clear the screen
+    triggerCinematic('neutral');
+    
+    // 3. Reset the UI elements
+    if (domainText) domainText.innerText = "NEUTRAL";
+    if (meterFill) {
+        meterFill.style.width = "0%";
+        meterFill.style.opacity = "0.5";
+    }
+}
+
+// --- Elements ---
+const resetNotif = document.getElementById('reset-notification');
+
+// --- HOTKEY RESET ---
+window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'r') {
+        // 1. Existing Reset Logic
+        lastReceivedDomain = 'neutral';
+        triggerCinematic('neutral');
+        if (domainText) domainText.innerText = "NEUTRAL";
+        if (meterFill) meterFill.style.width = "0%";
+
+        // 2. Trigger Notification Popup
+        if (resetNotif) {
+            resetNotif.classList.add('show');
+            
+            // Remove the notification after 1.5 seconds
+            setTimeout(() => {
+                resetNotif.classList.remove('show');
+            }, 1500);
+        }
+        
+        console.log("Environment Reset Triggered via 'R' key");
+    }
+});
