@@ -220,7 +220,7 @@ window.MahoragaEngine = (function() {
             // 5. Load the Model
             const loader = new GLTFLoader();
             // ⚠️ Verify this path matches the exact location of your GLB file
-            loader.load('./mahoraga.glb', (gltf) => {
+            loader.load('assets/mahoraga.glb', (gltf) => {
                 const model = gltf.scene;
                 model.position.set(0, 0, 0); 
                 domainGroup.add(model);

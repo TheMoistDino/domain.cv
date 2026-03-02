@@ -267,7 +267,7 @@ window.HakariEngine = (function() {
 
             // Slot Machine Models
             const loader = new GLTFLoader();
-            loader.load('./slot_machine.glb', function(gltf) {
+            loader.load('assets/slot_machine.glb', function(gltf) {
                 const originalSlot = gltf.scene;
                 originalSlot.scale.set(12, 12, 12); 
 

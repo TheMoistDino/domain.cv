@@ -205,7 +205,7 @@ window.PerfectionEngine = (function() {
 
             // Cleaned up GLTFLoader call
             const loader = new GLTFLoader();
-            loader.load('./self_embodiment_of_perfection__jujutsu_kaisen.glb', function(gltf) {
+            loader.load('assets/self_embodiment_of_perfection__jujutsu_kaisen.glb', function(gltf) {
                 const mahitoDomain = gltf.scene;
                 mahitoDomain.scale.set(5, 5, 5);     
                 mahitoDomain.position.set(0, -3, 0);  

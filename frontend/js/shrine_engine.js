@@ -401,7 +401,7 @@ window.ShrineEngine = (function() {
 
             // 6. Load the Model
             const loader = new GLTFLoader();
-            loader.load('./malevolent.glb', (gltf) => {
+            loader.load('assets/malevolent.glb', (gltf) => {
                 const shrineModel = gltf.scene;
                 
                 // Center and normalize scale

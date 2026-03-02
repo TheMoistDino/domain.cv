@@ -45,7 +45,7 @@ window.HigurumaEngine = (function() {
             // Trigger the Objection GIF overlay
             if (objContainer && objGif) {
                 objContainer.style.display = 'flex';
-                objGif.src = "objection.gif?t=" + Date.now(); // Forces GIF to restart
+                objGif.src = "assets/objection.gif?t=" + Date.now(); // Forces GIF to restart
             }
         }
         
@@ -182,7 +182,7 @@ window.HigurumaEngine = (function() {
             // 5. Load the Model
             const loader = new GLTFLoader();
             // ⚠️ Verify this path matches the exact location of your GLB file
-            loader.load('./Domain Expansion Hiromi Higuruma Low-poly 3D model.glb', (gltf) => {
+            loader.load('assets/Domain Expansion Hiromi Higuruma Low-poly 3D model.glb', (gltf) => {
                 const model = gltf.scene;
                 model.position.set(0, 4.85, 0); 
                 domainGroup.add(model);

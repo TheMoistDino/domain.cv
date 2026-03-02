@@ -52,6 +52,8 @@ domain-expansion-cv/
 ├── frontend/
 │   ├── index.html             (Web app interface)
 │   ├── style.css              (Shared styles)
+│   ├── assets/                (3D models folder)
+│   ├── archive/               (Original logic per class / engine)
 │   └── js/
 │       ├── main.js            (Webcam & MasterController)
 │       ├── void_engine.js     (Logic for infinite void)
