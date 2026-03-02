@@ -59,8 +59,9 @@ domain-expansion-cv/
 │       ├── perfection_engine.js   (Logic for self embodiment of perfection)
 │       ├── hakari_engine.js   (Logic for idle death gamble)
 │       ├── yuta_engine.js     (Logic for authentic mutual love)
+│       ├── chimera_engine.js  (Logic for chimera shadow garden)
 │       ├── higuruma_engine.js     (Logic for authentic mutual love)
-│       └── chimera_engine.js  (Logic for chimera shadow garden)
+│       └── mahoraga_engine.js     (Logic for summoning mahoraga)
 └── README.md
 ```
 ---
