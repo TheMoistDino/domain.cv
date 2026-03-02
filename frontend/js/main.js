@@ -61,11 +61,21 @@ ws.onerror = (error) => {
 
 // --- THE MASTER CONTROLLER ---
 function triggerCinematic(domain) {
-    // FIX: Completely reset CSS classes AND inline styles to prevent cross-contamination
     if (titleContainer) {
         titleContainer.className = ''; 
         titleContainer.style.textShadow = '';
         titleContainer.style.color = '';
+        
+        // --- FIX: PREVENT TITLE FLASHING ---
+        // Temporarily disable the CSS transition to instantly hide the text container
+        titleContainer.style.transition = 'none';
+        titleContainer.style.opacity = '0';
+        
+        // Force the browser to recalculate layout so the 0 opacity applies instantly
+        void titleContainer.offsetWidth; 
+        
+        // Restore the CSS transition for future engine animations
+        titleContainer.style.transition = '';
     }
 
     switch(domain) {
@@ -103,7 +113,6 @@ function triggerCinematic(domain) {
             if (titleEn) titleEn.innerText = "SELF-EMBODIMENT OF PERFECTION";
             if (titleJp) titleJp.innerText = "自閉円頓裹";
             if (titleContainer) {
-                // Mahito's Cyan Theme
                 titleContainer.style.textShadow = "0 0 20px rgba(0,150,255,.9), 0 0 50px rgba(0,80,200,.6)";
                 titleContainer.style.color = "rgba(255,255,255,.9)";
             }
@@ -114,11 +123,11 @@ function triggerCinematic(domain) {
             break;
 
         case "idle_death_gamble":
+        case "hakari": 
             if (titleEn) titleEn.innerText = "IDLE DEATH GAMBLE";
             if (titleJp) titleJp.innerText = "坐殺博徒";
             
             if (titleContainer) {
-                // Hakari's Pink/Gold Theme
                 titleContainer.style.textShadow = "0 0 20px rgba(255,215,0,.9), 0 0 50px rgba(255,50,150,.8)";
                 titleContainer.style.color = "rgba(255,215,0,.9)";
             }
@@ -127,23 +136,24 @@ function triggerCinematic(domain) {
             window.currentDomain = "hakari"; 
             if (window.HakariEngine) window.HakariEngine.init();
             break;
-
+            
         case "authentic_mutual_love":
+        case "yuta":
             if (titleEn) titleEn.innerText = "AUTHENTIC MUTUAL LOVE";
             if (titleJp) titleJp.innerText = "真贋相愛";
             
-            // Yuta's Ethereal Blue/Pink Theme
             if (titleContainer) {
                 titleContainer.style.textShadow = "0 0 20px rgba(200,220,255,.8), 0 0 50px rgba(255,150,200,.6), 0 0 100px rgba(255,255,255,.4)";
                 titleContainer.style.color = "rgba(240,245,255,.9)";
             }
-            if (flashEl) flashEl.style.background = "#050005"; // Pitch black fade-in
+            if (flashEl) flashEl.style.background = "#050005"; 
             
             window.currentDomain = "yuta"; 
             if (window.YutaEngine) window.YutaEngine.init();
             break;
 
         case "deadly_sentencing":
+        case "higuruma":
             if (titleEn) titleEn.innerText = "DEADLY SENTENCING";
             if (titleJp) titleJp.innerText = "誅伏賜死";
             

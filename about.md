@@ -1,4 +1,4 @@
-Here is your finalized hackathon submission! I have seamlessly woven your tedious camera framing and texture mapping efforts into the **Challenges** and **Accomplishments** sections to highlight your frontend perseverance, and structured your ideas for background removal and audio into a compelling **What's next** roadmap.
+Here is the updated `about.md` file with your new points about integrating AI and "vibecoding" smoothly woven into the **What we learned** and **Accomplishments** sections.
 
 ---
 
@@ -42,12 +42,14 @@ $$\theta = \arccos\left(\frac{\mathbf{A} \cdot \mathbf{B}}{|\mathbf{A}| |\mathbf
 
 We are incredibly proud of building a custom kinematic engine from scratch rather than relying on basic, pre-trained gesture models. By applying trigonometric principles, we successfully programmed the engine to recognize complex, multi-hand interlocking signs under suboptimal hackathon lighting.
 
-We are equally proud of our sheer perseverance on the frontend. Spending hours painstakingly adjusting camera coordinates and reconstructing disjointed 3D assets to ensure domains like Mahito's and Higuruma's looked authentic and cinematic paid off immensely, seamlessly bridging our backend computer vision logic with modern browser-based 3D rendering.
+We are equally proud of our sheer perseverance on the frontend. Spending hours painstakingly adjusting camera coordinates and reconstructing disjointed 3D assets to ensure domains like Mahito's and Higuruma's looked authentic and cinematic paid off immensely, seamlessly bridging our backend computer vision logic with modern browser-based 3D rendering. Crucially, despite neither of us having deep prior experience in computer vision or advanced web visuals, we successfully navigated these complex domains by adapting to a modern, AI-augmented workflow.
 
 ## What we learned
 
-We learned how to turn the failure states of a machine learning model into features. When our tracking struggled with occluded hands, we developed "macro-pose" logic—focusing on identifiable landmarks while mathematically ignoring noisy, hidden joints. Beyond the logic, managing high-frequency data streams using WebSockets for real-time web interactivity gave us a masterclass in full-stack latency optimization.
+We learned valuable "vibecoding" skills by integrating AI directly into our development workflow. This dramatically increased our efficiency, enabling us to rapidly prototype, debug obscure Three.js context errors, and implement complex mathematical kinematics far faster than traditional methods would have allowed.
+
+Additionally, we learned how to turn the failure states of a machine learning model into features. When our tracking struggled with occluded hands, we developed "macro-pose" logic—focusing on identifiable landmarks while mathematically ignoring noisy, hidden joints. Beyond the logic, managing high-frequency data streams using WebSockets for real-time web interactivity gave us a masterclass in full-stack latency optimization.
 
 ## What's next for domain.cv
 
-Our immediate next steps are to elevate the immersion by integrating spatial audio and authentic sound effects for each domain expansion. Visually, we are exploring real-time background removal (greenscreening) for the user's video feed, allowing us to composite the user directly *on top* of the 3D domain animations rather than relying on the Picture-in-Picture display.
+Our immediate next steps are to elevate the immersion by integrating spatial audio and authentic sound effects for each domain expansion. Visually, we are exploring real-time background removal (greenscreening) for the user's video feed, allowing us to composite the user directly *on top* of the 3D domain animations rather than relying on the Picture-in-Picture display. Finally, we plan to polish the remaining shikigami logic for Megumi's *Mahoraga* to complete the current roster.
