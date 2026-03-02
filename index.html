@@ -19,10 +19,10 @@
             width: 250px; 
             height: 162px; 
             border-radius: 10px;
-            border: 2px solid rgba(0, 255, 255, 0.5); /* Gives it a cool glowing border */
+            border: 2px solid rgba(0, 255, 255, 0.5);
             box-shadow: 0 0 20px rgba(0,0,0,0.8);
             object-fit: cover; 
-            z-index: 50; /* Ensures it sits above all the 3D and 2D canvases */
+            z-index: 50;
             transform: scaleX(-1);
         }
 
@@ -31,8 +31,8 @@
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             display: block; pointer-events: none;
         }
-        #gl-canvas { z-index: 5; }  /* WebGL (Chimera) goes behind 2D FX */
-        #fx-canvas { z-index: 10; } /* 2D Canvas (Void, Shrine, Chimera overlays) */
+        #gl-canvas { z-index: 5; }  /* WebGL goes behind 2D FX */
+        #fx-canvas { z-index: 10; } /* 2D Canvas */
 
         /* --- 3. Cinematic Flash & Titles --- */
         #flash {
@@ -60,14 +60,46 @@
 
         /* --- 4. Shared UI Overlay --- */
         #ui-layer { position: absolute; top: 20px; left: 20px; z-index: 30; pointer-events: none; }
-        .status-card { background: rgba(0, 0, 0, 0.6); padding: 20px; border-left: 4px solid #00ffff; pointer-events: auto; }
-        #domain-name-display { color: #00ffff; text-transform: uppercase; font-family: sans-serif; }
+        .status-card { 
+            background: rgba(220, 220, 220, 0.85); /* Light gray background */
+            padding: 20px; 
+            border-left: 4px solid #111; /* Dark border for contrast */
+            pointer-events: auto; 
+            color: #111; 
+            border-radius: 4px;
+        }
+        #domain-name-display { 
+            color: #111; 
+            text-transform: uppercase; 
+            font-family: 'Noto Serif JP', serif; /* Matched to domain title font */
+            font-weight: 900;
+        }
         
-        #energy-meter-container { margin-top: 10px; width: 300px; font-family: sans-serif; }
-        #energy-label { font-size: 12px; letter-spacing: 2px; color: #00ffff; margin-bottom: 5px; }
-        #energy-meter-path { width: 100%; height: 10px; background: rgba(255,255,255,0.2); border: 1px solid #00ffff; }
-        #energy-meter-fill { width: 0%; height: 100%; background: #00ffff; box-shadow: 0 0 10px #00ffff; transition: width 0.1s; }
-
+        #energy-meter-container { 
+            margin-top: 10px; 
+            width: 300px; 
+            font-family: 'Noto Serif JP', serif; 
+        }
+        #energy-label { 
+            font-size: 12px; 
+            letter-spacing: 2px; 
+            color: #333; 
+            margin-bottom: 5px; 
+            font-weight: 900;
+        }
+        #energy-meter-path { 
+            width: 100%; 
+            height: 10px; 
+            background: rgba(0,0,0,0.1); 
+            border: 1px solid #333; 
+        }
+        #energy-meter-fill { 
+            width: 0%; 
+            height: 100%; 
+            background: #111; /* Dark fill for cursed energy */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5); 
+            transition: width 0.1s; 
+        }
         /* --- 5. Guide Squares --- */
         #guide-layer { position: absolute; top: 20px; right: 20px; z-index: 30; display: flex; flex-direction: column; gap: 10px; font-family: sans-serif;}
         .guide-item {
@@ -82,14 +114,14 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(255, 0, 85, 0.8); /* Matches your reset button color */
+            background: rgba(255, 0, 85, 0.8);
             color: white;
             padding: 15px 30px;
             border-radius: 5px;
             font-family: monospace;
             font-weight: bold;
             letter-spacing: 2px;
-            z-index: 100; /* Above all canvases and video */
+            z-index: 100;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s ease;
@@ -106,9 +138,15 @@
             100% { transform: translate(-50%, -50%) scale(1); }
         }
     </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
-    <img id="input_video" alt="" />
+    
+    <video id="input_video" autoplay playsinline></video>
 
     <canvas id="gl-canvas"></canvas>
     <canvas id="fx-canvas"></canvas>
@@ -134,6 +172,8 @@
         <div class="guide-item" id="guide-garden"><span>Garden</span></div>
     </div>
 
+    <div id="reset-notification">environment reset.</div>
+
     <script type="importmap">
       {
         "imports": {
@@ -153,9 +193,8 @@
     <script type="module" src="js/higuruma_engine.js"></script>
     <script type="module" src="js/mahoraga_engine.js"></script>
     
+    <script src="js/vision_logic.js"></script>
     <script src="js/main.js"></script>
-    <div id="reset-notification">environment reset.</div>
-</body>
-</html>
+
 </body>
 </html>

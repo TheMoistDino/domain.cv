@@ -1,8 +1,9 @@
 // --- Elements ---
-const inputVideoUI = document.getElementById('input_video');
+const videoElement = document.getElementById('input_video');
 const domainText = document.getElementById('domain-name-display');
 const guideLayer = document.getElementById('guide-layer');
 const meterFill = document.getElementById('energy-meter-fill');
+const resetNotif = document.getElementById('reset-notification');
 
 // Cinematic Title Elements
 const titleEn = document.getElementById('title-en');
@@ -10,54 +11,83 @@ const titleJp = document.getElementById('title-jp');
 const titleContainer = document.getElementById('domain-title');
 const flashEl = document.getElementById('flash');
 
-// Initialize State
+// --- Initialize State ---
 window.currentDomain = 'neutral';
-let lastReceivedDomain = 'neutral'; // NEW: Decoupled backend state tracker
+let lastReceivedDomain = 'neutral'; 
 
-// --- Connect to Backend ---
-const ws = new WebSocket("ws://localhost:8000/ws");
+// --- Initialize Vision Logic Engine ---
+const recognizer = new GestureRecognizer(); 
 
-ws.onopen = () => {
-    console.log("Connected to Python Server! Waiting for video stream...");
-    if (domainText) domainText.innerText = "NEUTRAL";
-};
+// --- MediaPipe Setup ---
+const hands = new Hands({locateFile: (file) => {
+  return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+}});
 
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    const newDomain = data.domain;
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
 
-    // 1. Render the backend's skeleton video stream directly to the UI
-    if (inputVideoUI && data.image) {
-        inputVideoUI.src = data.image;
-    }
+let hasConnected = false; 
 
-    // 2. Hide UI guide squares if a cinematic is playing
-    if (newDomain === "neutral") {
-        if (guideLayer) guideLayer.style.display = 'flex';
+// This runs every time the JS model processes a frame
+hands.onResults((results) => {
+    
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        
+        // 1. Get both the domain AND progress from the recognizer
+        let engineData = recognizer.getDomainExpansion(results.multiHandLandmarks);
+        let detectedDomain = engineData.domain;
+        let buildUp = engineData.progress;
+        
+        // --- FIX: ANIMATE CURSED ENERGY METER ---
+        if (meterFill) {
+            meterFill.style.width = `${buildUp * 100}%`;
+        }
+
+        if (!hasConnected && domainText) {
+            hasConnected = true;
+            domainText.innerText = "NEUTRAL";
+            console.log("MediaPipe successfully tracking hands!");
+        }
+
+        // Update the UI text
+        if (domainText && detectedDomain !== "neutral") {
+            domainText.innerText = detectedDomain.toUpperCase().replace(/_/g, " ");
+        } else if (domainText && detectedDomain === "neutral" && hasConnected) {
+            // Optional: Show what is currently building up if hands are held but not fully locked in
+            if (recognizer.candidateDomain !== "neutral" && buildUp > 0) {
+                domainText.innerText = `DETECTING: ${recognizer.candidateDomain.toUpperCase().replace(/_/g, " ")}`;
+            } else {
+                domainText.innerText = "NEUTRAL";
+            }
+        }
+
+        // 2. Trigger the 3D cinematic
+        if (detectedDomain !== "neutral" && detectedDomain !== window.currentDomain) {
+            triggerCinematic(detectedDomain); 
+        }
     } else {
-        if (guideLayer) guideLayer.style.display = 'none';
+        // If hands drop off-screen, drain the meter and reset text
+        if (hasConnected && domainText && window.currentDomain === 'neutral') {
+            domainText.innerText = "NEUTRAL";
+        }
+        if (meterFill) meterFill.style.width = "0%";
     }
+});
 
-    // 3. Update UI Text & Energy Meter
-    if (domainText) {
-        domainText.innerText = newDomain.toUpperCase().replace(/_/g, ' ');
-    }
-    if (meterFill) {
-        meterFill.style.width = (data.progress * 100) + "%";
-        meterFill.style.opacity = 0.5 + (data.progress * 0.5);
-    }
+// --- Start Webcam ---
+const camera = new Camera(videoElement, {
+  onFrame: async () => {
+    await hands.send({image: videoElement});
+  },
+  width: 640,
+  height: 480
+});
+camera.start();
 
-    // 4. FIX: Only trigger the Master Controller if the backend state ACTUALLY changes
-    if (lastReceivedDomain !== newDomain) {
-        lastReceivedDomain = newDomain;
-        triggerCinematic(newDomain);
-    }
-};
-
-ws.onerror = (error) => {
-    console.error("WebSocket Error:", error);
-    if (domainText) domainText.innerText = "CONNECTION ERROR";
-};
 
 // --- THE MASTER CONTROLLER ---
 function triggerCinematic(domain) {
@@ -67,14 +97,9 @@ function triggerCinematic(domain) {
         titleContainer.style.color = '';
         
         // --- FIX: PREVENT TITLE FLASHING ---
-        // Temporarily disable the CSS transition to instantly hide the text container
         titleContainer.style.transition = 'none';
         titleContainer.style.opacity = '0';
-        
-        // Force the browser to recalculate layout so the 0 opacity applies instantly
         void titleContainer.offsetWidth; 
-        
-        // Restore the CSS transition for future engine animations
         titleContainer.style.transition = '';
     }
 
@@ -192,41 +217,22 @@ function triggerCinematic(domain) {
     console.log("Cinematic Engine switched to:", window.currentDomain);
 }
 
-// --- HOTKEY RESET FUNCTIONALITY ---
-function triggerReset() {
-    console.log("Environment Reset Triggered via 'R' key");
-    
-    // 1. Force the backend tracker to 'neutral' so it doesn't ignore the next frame
-    lastReceivedDomain = 'neutral';
-    
-    // 2. Force the cinematic engines to clear the screen
-    triggerCinematic('neutral');
-    
-    // 3. Reset the UI elements
-    if (domainText) domainText.innerText = "NEUTRAL";
-    if (meterFill) {
-        meterFill.style.width = "0%";
-        meterFill.style.opacity = "0.5";
-    }
-}
-
-// --- Elements ---
-const resetNotif = document.getElementById('reset-notification');
-
 // --- HOTKEY RESET ---
 window.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'r') {
-        // 1. Existing Reset Logic
         lastReceivedDomain = 'neutral';
         triggerCinematic('neutral');
+        
+        // Reset the UI elements
         if (domainText) domainText.innerText = "NEUTRAL";
-        if (meterFill) meterFill.style.width = "0%";
+        if (meterFill) {
+            meterFill.style.width = "0%";
+            meterFill.style.opacity = "0.5";
+        }
 
-        // 2. Trigger Notification Popup
+        // Trigger Notification Popup
         if (resetNotif) {
             resetNotif.classList.add('show');
-            
-            // Remove the notification after 1.5 seconds
             setTimeout(() => {
                 resetNotif.classList.remove('show');
             }, 1500);
