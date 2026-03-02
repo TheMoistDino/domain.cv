@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Domain Expansion: Malevolent Shrine</title>
+<title>Domain Expansion: Malevolent Shrine (3D)</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@200;300;900&display=swap');
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#000; overflow:hidden; cursor:none; font-family:'Noto Serif JP',serif; }
 
-canvas#main { position:fixed; top:0; left:0; z-index:0; display:block; }
+canvas#webgl { position:fixed; top:0; left:0; z-index:-1; display:block; opacity:0; transition:opacity 0.6s; }
+canvas#main { position:fixed; top:0; left:0; z-index:0; display:block; pointer-events:none; }
 
 #flash {
   position:fixed; inset:0; z-index:20; pointer-events:none;
@@ -49,8 +50,11 @@ canvas#main { position:fixed; top:0; left:0; z-index:0; display:block; }
   z-index:9; letter-spacing:.15em; pointer-events:none;
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
+<canvas id="webgl"></canvas>
 <canvas id="main"></canvas>
 <div id="flash"></div>
 <div id="domain-title"><span class="jp">伏魔御廚子</span><span class="en">MALEVOLENT SHRINE</span></div>
@@ -58,10 +62,58 @@ canvas#main { position:fixed; top:0; left:0; z-index:0; display:block; }
 <div id="hint">window.currentDomain = 'shrine' | 'neutral'</div>
 
 <script>
-// ─── CAMERA ──────────────────────────────────────────────────────────
+// ─── CAMERA (Webcam) ─────────────────────────────────────────────────
 (async()=>{
   try { const s=await navigator.mediaDevices.getUserMedia({video:true}); document.getElementById('input_video').srcObject=s; } catch(e){}
 })();
+
+// ─── THREE.JS SETUP ──────────────────────────────────────────────────
+const webglCanvas = document.getElementById('webgl');
+const renderer = new THREE.WebGLRenderer({ canvas: webglCanvas, antialias: true });
+const scene = new THREE.Scene();
+
+// Give the scene a dark crimson background and fog to match the domain vibe
+scene.background = new THREE.Color(0x0a0000);
+scene.fog = new THREE.FogExp2(0x0a0000, 0.04);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xff4422, 0.4); 
+scene.add(ambientLight);
+const pointLight = new THREE.PointLight(0xff1100, 2.5, 50);
+pointLight.position.set(0, 5, 0);
+scene.add(pointLight);
+const dirLight = new THREE.DirectionalLight(0xff5533, 1.5);
+dirLight.position.set(10, 15, 10);
+scene.add(dirLight);
+
+// Load the 3D model
+let shrineModel = null;
+const loader = new THREE.GLTFLoader();
+loader.load('malevolent.glb', (gltf) => {
+  shrineModel = gltf.scene;
+  
+  // Center and normalize scale so it fits the camera view nicely
+  const box = new THREE.Box3().setFromObject(shrineModel);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  
+  const scale = 15 / maxDim;
+  shrineModel.scale.set(scale, scale, scale);
+  
+  shrineModel.position.x = -center.x * scale;
+  shrineModel.position.y = -center.y * scale - 2; // offset down slightly
+  shrineModel.position.z = -center.z * scale;
+  
+  shrineModel.rotation.y = Math.PI;
+  
+  scene.add(shrineModel);
+}, undefined, (error) => {
+  console.error("Failed to load malevolent.glb. Make sure the file is in the same folder and you're running a local server.", error);
+});
+
 
 // ─── STATE ───────────────────────────────────────────────────────────
 window.currentDomain = 'neutral';
@@ -74,39 +126,44 @@ let shake    = 0;
 let t        = 0;
 let dt       = 0;
 let lastTime = 0;
+let cameraAngle = 0;
 
+// Set 2D context to alpha: true so the WebGL canvas can be seen underneath
 const C = document.getElementById('main');
-const X = C.getContext('2d', { alpha: false });
+const X = C.getContext('2d', { alpha: true });
 let W, H;
 
 function resize() {
   W = C.width = window.innerWidth;
   H = C.height = window.innerHeight;
-  buildSprites();
+  
+  // Update WebGL
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+  
+  LIGHTNING.forEach(rebuildLightning);
 }
 window.addEventListener('resize', resize);
 
 // ─── SLASH DATA ───────────────────────────────────────────────────────
-// Wild diagonal cuts ripping across the screen on activation
-const SLASH_COUNT = 28;
+const SLASH_COUNT = 35; // Increased for continuous effect
 const slashes = Array.from({ length: SLASH_COUNT }, (_, i) => makeSlash(i));
 
 function makeSlash(i) {
-  const steep = Math.random() > 0.5;
   return {
-    // start/end as fractions of screen
     x0: Math.random(),
     y0: Math.random(),
-    angle: (Math.random() - 0.5) * Math.PI * 0.6 + (steep ? Math.PI*0.5 : 0),
+    // Changed to a fully random angle (0 to 360 degrees / 2*PI radians)
+    angle: Math.random() * Math.PI * 2,
     len:   0.4 + Math.random() * 0.7,
     width: 1.5 + Math.random() * 5,
-    speed: 3.0 + Math.random() * 4.0,   // how fast it travels across (screen/sec)
-    progress: -(Math.random() * 0.6),   // staggered start, negative = not started
+    speed: 3.0 + Math.random() * 4.0, 
+    progress: -(Math.random() * 0.6), 
     color: Math.random() > 0.4 ? [255,255,255] : Math.random() > 0.5 ? [255,60,20] : [20,20,20],
     brightness: 0.6 + Math.random() * 0.4,
   };
 }
-
 // ─── FLAME PARTICLES ──────────────────────────────────────────────────
 const FLAME_COUNT = 120;
 const flames = Array.from({ length: FLAME_COUNT }, makeFlame);
@@ -114,23 +171,15 @@ const flames = Array.from({ length: FLAME_COUNT }, makeFlame);
 function makeFlame() {
   return {
     x:     Math.random(),
-    y:     0.5 + Math.random() * 0.6,   // bottom half
+    y:     0.5 + Math.random() * 0.6,
     vy:   -(0.04 + Math.random() * 0.12),
     vx:    (Math.random() - 0.5) * 0.02,
-    life:  Math.random(),                // 0..1
+    life:  Math.random(),
     size:  4 + Math.random() * 18,
-    black: Math.random() > 0.45,        // black flame vs dark red
+    black: Math.random() > 0.45,
     speed: 0.4 + Math.random() * 0.6,
   };
 }
-
-// ─── GROUND SLASHES (radiating lines on ground plane) ─────────────────
-const GROUND_SLASHES = Array.from({ length: 22 }, (_, i) => ({
-  angle:  (i / 22) * Math.PI + (Math.random() - 0.5) * 0.3,
-  len:    0.2 + Math.random() * 0.5,
-  width:  0.5 + Math.random() * 2,
-  offset: Math.random() * 0.15,
-}));
 
 // ─── RED LIGHTNING ─────────────────────────────────────────────────────
 const LIGHTNING = Array.from({ length: 8 }, () => ({
@@ -153,450 +202,20 @@ function rebuildLightning(l) {
   }
 }
 
-// ─── SPRITES ──────────────────────────────────────────────────────────
-let shrineSprite = null;
-
-function buildSprites() {
-  buildShrineSprite();
-  LIGHTNING.forEach(rebuildLightning);
-}
-
-function buildShrineSprite() {
-  const s = document.createElement('canvas');
-  s.width = W; s.height = H;
-  const sx = s.getContext('2d');
-
-  // ── Crimson sky gradient ───────────────────────────────────────
-  const sky = sx.createLinearGradient(0, 0, 0, H * 0.72);
-  sky.addColorStop(0,   '#000000');
-  sky.addColorStop(0.15,'#0d0000');
-  sky.addColorStop(0.4, '#1a0000');
-  sky.addColorStop(0.65,'#2d0500');
-  sky.addColorStop(1,   '#180200');
-  sx.fillStyle = sky;
-  sx.fillRect(0, 0, W, H);
-
-  // ── Ground plane ──────────────────────────────────────────────
-  const ground = sx.createLinearGradient(0, H*0.65, 0, H);
-  ground.addColorStop(0, '#0a0000');
-  ground.addColorStop(0.4, '#150000');
-  ground.addColorStop(1, '#050000');
-  sx.fillStyle = ground;
-  sx.fillRect(0, H * 0.65, W, H * 0.35);
-
-  // Subtle horizon glow
-  const hglow = sx.createRadialGradient(W*0.5, H*0.66, 0, W*0.5, H*0.66, W*0.6);
-  hglow.addColorStop(0,   'rgba(200,30,0,0.18)');
-  hglow.addColorStop(0.4, 'rgba(120,10,0,0.08)');
-  hglow.addColorStop(1,   'rgba(0,0,0,0)');
-  sx.fillStyle = hglow;
-  sx.fillRect(0, 0, W, H);
-
-  // ── Torii gate ────────────────────────────────────────────────
-  drawTorii(sx);
-
-  // ── Distant skull/oni decorations (faint) ─────────────────────
-  drawSkulls(sx);
-
-  shrineSprite = s;
-}
-
-function drawTorii(sx) {
-  // Full ornate shrine building matching the reference:
-  // - Japanese shrine with multi-tiered curved roof
-  // - Orange/gold glowing trim
-  // - Two large demon horns above the roof
-  // - Dark archway entrance
-  // - Reflection in still water below
-  // - Blue glowing side pillars on floor
-
-  const cx = W * 0.5;
-  const groundY = H * 0.62;  // horizon / water line
-
-  // Building proportions
-  const bw  = W * 0.22;   // half-width of building
-  const bh  = H * 0.30;   // total building height above ground
-  const top = groundY - bh;
-
-  sx.save();
-
-  // ── Outer glow around shrine ──────────────────────────────────
-  const glow = sx.createRadialGradient(cx, groundY - bh*0.4, 0, cx, groundY - bh*0.4, bw*1.8);
-  glow.addColorStop(0,   'rgba(220,80,0,0.28)');
-  glow.addColorStop(0.4, 'rgba(160,40,0,0.14)');
-  glow.addColorStop(1,   'rgba(0,0,0,0)');
-  sx.fillStyle = glow;
-  sx.fillRect(cx - bw*2, top - bh*0.3, bw*4, bh*1.8);
-
-  // ── Left + Right thick pillars ────────────────────────────────
-  function drawPillar(x, y, w, h) {
-    // Base pillar — dark reddish brown
-    const pg = sx.createLinearGradient(x - w*0.5, 0, x + w*0.5, 0);
-    pg.addColorStop(0,   '#1a0400');
-    pg.addColorStop(0.2, '#3d0e00');
-    pg.addColorStop(0.5, '#5a1a00');
-    pg.addColorStop(0.8, '#3d0e00');
-    pg.addColorStop(1,   '#1a0400');
-    sx.fillStyle = pg;
-    sx.fillRect(x - w*0.5, y, w, h);
-
-    // Orange glow edge left
-    const eg = sx.createLinearGradient(x - w*0.5, 0, x - w*0.5 + w*0.25, 0);
-    eg.addColorStop(0,   'rgba(255,120,0,0.55)');
-    eg.addColorStop(1,   'rgba(255,80,0,0)');
-    sx.fillStyle = eg;
-    sx.fillRect(x - w*0.5, y, w*0.25, h);
-
-    // Orange glow edge right
-    const eg2 = sx.createLinearGradient(x + w*0.5 - w*0.25, 0, x + w*0.5, 0);
-    eg2.addColorStop(0,  'rgba(255,80,0,0)');
-    eg2.addColorStop(1,  'rgba(255,120,0,0.45)');
-    sx.fillStyle = eg2;
-    sx.fillRect(x + w*0.5 - w*0.25, y, w*0.25, h);
-
-    // Front-face orange trim strip
-    sx.fillStyle = 'rgba(255,140,20,0.35)';
-    sx.fillRect(x - w*0.5 + w*0.08, y, w*0.06, h);
-    sx.fillRect(x + w*0.5 - w*0.14, y, w*0.06, h);
-  }
-
-  const pillarW = bw * 0.18;
-  const pillarH = bh * 0.68;
-  const pillarY = groundY - pillarH;
-  drawPillar(cx - bw*0.62, pillarY, pillarW, pillarH);
-  drawPillar(cx + bw*0.62, pillarY, pillarW, pillarH);
-
-  // ── Dark archway / interior ────────────────────────────────────
-  const archW = bw * 0.8;
-  const archH = bh * 0.52;
-  const archY = groundY - archH;
-
-  // Interior darkness
-  sx.fillStyle = '#000';
-  sx.beginPath();
-  sx.moveTo(cx - archW*0.5, groundY);
-  sx.lineTo(cx - archW*0.5, archY + archH*0.12);
-  sx.quadraticCurveTo(cx - archW*0.5, archY, cx, archY);
-  sx.quadraticCurveTo(cx + archW*0.5, archY, cx + archW*0.5, archY + archH*0.12);
-  sx.lineTo(cx + archW*0.5, groundY);
-  sx.closePath();
-  sx.fill();
-
-  // Arch frame — orange-gold trim
-  sx.strokeStyle = 'rgba(255,130,20,0.7)';
-  sx.lineWidth = 3;
-  sx.beginPath();
-  sx.moveTo(cx - archW*0.5, groundY);
-  sx.lineTo(cx - archW*0.5, archY + archH*0.12);
-  sx.quadraticCurveTo(cx - archW*0.5, archY, cx, archY);
-  sx.quadraticCurveTo(cx + archW*0.5, archY, cx + archW*0.5, archY + archH*0.12);
-  sx.lineTo(cx + archW*0.5, groundY);
-  sx.stroke();
-
-  // Inner glow of archway (blue-white light from inside — figure standing)
-  const archGlow = sx.createRadialGradient(cx, groundY - archH*0.35, 0, cx, groundY - archH*0.35, archW*0.5);
-  archGlow.addColorStop(0,   'rgba(140,200,255,0.25)');
-  archGlow.addColorStop(0.4, 'rgba(80,140,220,0.10)');
-  archGlow.addColorStop(1,   'rgba(0,0,0,0)');
-  sx.fillStyle = archGlow;
-  sx.beginPath();
-  sx.moveTo(cx - archW*0.5, groundY);
-  sx.lineTo(cx - archW*0.5, archY + archH*0.12);
-  sx.quadraticCurveTo(cx - archW*0.5, archY, cx, archY);
-  sx.quadraticCurveTo(cx + archW*0.5, archY, cx + archW*0.5, archY + archH*0.12);
-  sx.lineTo(cx + archW*0.5, groundY);
-  sx.closePath();
-  sx.fill();
-
-  // Scroll/decorative detail band above arch (horizontal black bars like in ref)
-  const scrollY = archY - bh*0.04;
-  sx.fillStyle = '#0a0000';
-  sx.fillRect(cx - bw*0.82, scrollY, bw*1.64, bh*0.08);
-  sx.strokeStyle = 'rgba(200,80,0,0.5)';
-  sx.lineWidth = 1.5;
-  sx.strokeRect(cx - bw*0.82, scrollY, bw*1.64, bh*0.08);
-  // Decorative horizontal lines
-  for (let i = 0; i < 6; i++) {
-    const lx = cx - bw*0.75 + i*(bw*1.5/6);
-    sx.fillStyle = 'rgba(180,60,0,0.4)';
-    sx.fillRect(lx, scrollY + 2, bw*0.18, bh*0.04);
-  }
-
-  // ── Roof structure ────────────────────────────────────────────
-  // Main roof: curved with upturned eaves (irimoya style)
-  const roofBot = top + bh*0.38;
-  const roofMid = top + bh*0.20;
-  const roofTop = top + bh*0.02;
-
-  function drawRoofTier(y_bot, y_top, width, alpha) {
-    const rg = sx.createLinearGradient(0, y_top, 0, y_bot);
-    rg.addColorStop(0,   `rgba(20,5,0,${alpha})`);
-    rg.addColorStop(0.5, `rgba(35,10,0,${alpha})`);
-    rg.addColorStop(1,   `rgba(15,3,0,${alpha})`);
-
-    // Main roof body — flat top, curved eaves
-    sx.beginPath();
-    sx.moveTo(cx - width*0.1, y_top);
-    sx.lineTo(cx + width*0.1, y_top);
-    // Right eave — curves up at tip
-    sx.quadraticCurveTo(cx + width*0.6,  y_top + (y_bot-y_top)*0.5, cx + width, y_bot - (y_bot-y_top)*0.12);
-    sx.lineTo(cx + width*0.88, y_bot);
-    sx.lineTo(cx, y_bot - (y_bot-y_top)*0.04);  // slight ridge
-    sx.lineTo(cx - width*0.88, y_bot);
-    sx.lineTo(cx - width, y_bot - (y_bot-y_top)*0.12);
-    // Left eave
-    sx.quadraticCurveTo(cx - width*0.6, y_top + (y_bot-y_top)*0.5, cx - width*0.1, y_top);
-    sx.closePath();
-    sx.fillStyle = rg;
-    sx.fill();
-
-    // Gold/orange trim along roof edge
-    sx.strokeStyle = `rgba(255,150,20,${alpha * 0.8})`;
-    sx.lineWidth = 2.5;
-    sx.beginPath();
-    sx.moveTo(cx - width*0.88, y_bot);
-    sx.lineTo(cx - width, y_bot - (y_bot-y_top)*0.12);
-    sx.quadraticCurveTo(cx - width*0.6, y_top + (y_bot-y_top)*0.5, cx - width*0.1, y_top);
-    sx.lineTo(cx + width*0.1, y_top);
-    sx.quadraticCurveTo(cx + width*0.6, y_top + (y_bot-y_top)*0.5, cx + width, y_bot - (y_bot-y_top)*0.12);
-    sx.lineTo(cx + width*0.88, y_bot);
-    sx.stroke();
-
-    // Roof ridge tile dots
-    const dotCount = Math.floor(width * 1.6);
-    for (let i = 0; i <= dotCount; i++) {
-      const dx = cx - width*0.88 + i*(width*1.76/dotCount);
-      sx.fillStyle = `rgba(200,100,10,${alpha*0.6})`;
-      sx.fillRect(dx, y_bot - 2, 3, 3);
-    }
-  }
-
-  // Lower main roof tier
-  drawRoofTier(roofBot, roofMid, bw*1.05, 1.0);
-  // Upper smaller tier
-  drawRoofTier(roofMid + bh*0.02, roofTop, bw*0.52, 1.0);
-
-  // ── Roof cap / finial ──────────────────────────────────────────
-  sx.fillStyle = '#1a0500';
-  sx.fillRect(cx - bw*0.06, roofTop - bh*0.03, bw*0.12, bh*0.05);
-  sx.strokeStyle = 'rgba(255,140,20,0.7)';
-  sx.lineWidth = 1.5;
-  sx.strokeRect(cx - bw*0.06, roofTop - bh*0.03, bw*0.12, bh*0.05);
-
-  // ── Demon horns / tusks ───────────────────────────────────────
-  // Two large curved horns rising above the roof (like in reference)
-  function drawHorn(side) {
-    const hx = cx + side * bw * 0.28;
-    const hBase = roofTop - bh*0.01;
-    const hTipX = cx + side * bw * 0.44;
-    const hTipY = hBase - bh*0.25;
-    const hCtrlX = cx + side * bw * 0.10;
-    const hCtrlY = hBase - bh*0.18;
-
-    // Outer (second) horn slightly further out
-    const h2x = cx + side * bw * 0.40;
-    const h2TipX = cx + side * bw * 0.58;
-    const h2TipY = hBase - bh*0.20;
-
-    // Main horn
-    sx.beginPath();
-    sx.moveTo(hx - side*8, hBase);
-    sx.quadraticCurveTo(hCtrlX, hCtrlY, hTipX, hTipY);
-    sx.quadraticCurveTo(hCtrlX + side*6, hCtrlY + bh*0.04, hx + side*4, hBase);
-    sx.closePath();
-    const hornG = sx.createLinearGradient(hx, hBase, hTipX, hTipY);
-    hornG.addColorStop(0,   '#2d0800');
-    hornG.addColorStop(0.5, '#1a0400');
-    hornG.addColorStop(1,   '#0a0200');
-    sx.fillStyle = hornG;
-    sx.fill();
-    sx.strokeStyle = 'rgba(180,60,0,0.5)';
-    sx.lineWidth = 1.5;
-    sx.stroke();
-
-    // Outer horn
-    sx.beginPath();
-    sx.moveTo(h2x - side*5, hBase);
-    sx.quadraticCurveTo(h2x + side*15, hBase - bh*0.12, h2TipX, h2TipY);
-    sx.quadraticCurveTo(h2x + side*20, hBase - bh*0.08, h2x + side*8, hBase);
-    sx.closePath();
-    sx.fillStyle = hornG;
-    sx.fill();
-    sx.strokeStyle = 'rgba(150,40,0,0.4)';
-    sx.lineWidth = 1;
-    sx.stroke();
-  }
-  drawHorn(-1);
-  drawHorn(1);
-
-  // ── Waterline / reflection ─────────────────────────────────────
-  // Subtle water surface line
-  sx.strokeStyle = 'rgba(80,160,220,0.25)';
-  sx.lineWidth = 1;
-  sx.beginPath();
-  sx.moveTo(0, groundY);
-  sx.lineTo(W, groundY);
-  sx.stroke();
-
-  // Reflection — draw the shrine flipped below groundY
-  sx.save();
-  sx.translate(cx, groundY);
-  sx.scale(1, -1);
-  sx.translate(-cx, -groundY);
-  sx.globalAlpha = 0.4;
-
-  // Reflect pillars
-  drawPillar(cx - bw*0.62, pillarY, pillarW, pillarH);
-  drawPillar(cx + bw*0.62, pillarY, pillarW, pillarH);
-  // Reflect arch interior
-  sx.fillStyle = '#000';
-  sx.beginPath();
-  sx.moveTo(cx - archW*0.5, groundY);
-  sx.lineTo(cx - archW*0.5, archY + archH*0.12);
-  sx.quadraticCurveTo(cx - archW*0.5, archY, cx, archY);
-  sx.quadraticCurveTo(cx + archW*0.5, archY, cx + archW*0.5, archY + archH*0.12);
-  sx.lineTo(cx + archW*0.5, groundY);
-  sx.closePath();
-  sx.fill();
-  // Reflect roofs
-  drawRoofTier(roofBot, roofMid, bw*1.05, 0.9);
-  drawRoofTier(roofMid + bh*0.02, roofTop, bw*0.52, 0.9);
-
-  sx.restore();
-
-  // Reflection fade overlay (water obscures lower reflection)
-  const reflFade = sx.createLinearGradient(0, groundY, 0, groundY + bh*0.6);
-  reflFade.addColorStop(0,   'rgba(0,0,0,0)');
-  reflFade.addColorStop(0.5, 'rgba(0,0,2,0.55)');
-  reflFade.addColorStop(1,   'rgba(0,0,5,0.85)');
-  sx.fillStyle = reflFade;
-  sx.fillRect(0, groundY, W, bh*0.7);
-
-  // ── Blue glowing side pillars on floor (from reference) ───────
-  function drawBluePillar(x) {
-    const bpH = H * 0.22;
-    const bpW = W * 0.04;
-    const bpY = groundY;
-
-    // Blue glow halo
-    const bg = sx.createRadialGradient(x, bpY - bpH*0.4, 0, x, bpY - bpH*0.4, bpW*3.5);
-    bg.addColorStop(0,   'rgba(60,180,255,0.4)');
-    bg.addColorStop(0.4, 'rgba(30,120,220,0.2)');
-    bg.addColorStop(1,   'rgba(0,0,0,0)');
-    sx.fillStyle = bg;
-    sx.fillRect(x - bpW*4, bpY - bpH*0.6, bpW*8, bpH*0.8);
-
-    // Pillar body
-    const ppg = sx.createLinearGradient(x - bpW*0.5, 0, x + bpW*0.5, 0);
-    ppg.addColorStop(0,   '#000a14');
-    ppg.addColorStop(0.3, '#001830');
-    ppg.addColorStop(0.7, '#001830');
-    ppg.addColorStop(1,   '#000a14');
-    sx.fillStyle = ppg;
-    sx.fillRect(x - bpW*0.5, bpY - bpH, bpW, bpH);
-
-    // Blue rim glow
-    sx.strokeStyle = 'rgba(80,200,255,0.6)';
-    sx.lineWidth = 1.5;
-    sx.strokeRect(x - bpW*0.5, bpY - bpH, bpW, bpH);
-
-    // Glowing interior stripe
-    const sg = sx.createLinearGradient(x - bpW*0.5, 0, x + bpW*0.5, 0);
-    sg.addColorStop(0,   'rgba(0,0,0,0)');
-    sg.addColorStop(0.45,'rgba(100,220,255,0.5)');
-    sg.addColorStop(0.55,'rgba(120,230,255,0.5)');
-    sg.addColorStop(1,   'rgba(0,0,0,0)');
-    sx.fillStyle = sg;
-    sx.fillRect(x - bpW*0.5, bpY - bpH, bpW, bpH);
-
-    // Reflection below
-    const rg2 = sx.createLinearGradient(0, bpY, 0, bpY + bpH*0.5);
-    rg2.addColorStop(0,   'rgba(60,180,255,0.3)');
-    rg2.addColorStop(1,   'rgba(0,0,0,0)');
-    sx.fillStyle = rg2;
-    sx.fillRect(x - bpW*0.5, bpY, bpW, bpH*0.5);
-  }
-
-  drawBluePillar(W * 0.18);
-  drawBluePillar(W * 0.82);
-
-  // Tiled floor plane (perspective grid lines, subtle)
-  sx.globalAlpha = 0.12;
-  sx.strokeStyle = '#003060';
-  sx.lineWidth = 0.5;
-  for (let i = 0; i < 12; i++) {
-    const fy = groundY + i * (H - groundY) / 11;
-    sx.beginPath(); sx.moveTo(0, fy); sx.lineTo(W, fy); sx.stroke();
-  }
-  // Perspective vertical lines
-  for (let i = -6; i <= 6; i++) {
-    sx.beginPath();
-    sx.moveTo(cx + i * bw*0.4, groundY);
-    sx.lineTo(cx + i * W*0.25, H);
-    sx.stroke();
-  }
-  sx.globalAlpha = 1;
-
-  sx.restore();
-}
-
-function drawSkulls(sx) {
-  // Red cloud shapes in the sky (like the churning dark red clouds in the reference)
-  const cloudDefs = [
-    { x: W*0.12, y: H*0.12, r: W*0.14 },
-    { x: W*0.32, y: H*0.08, r: W*0.12 },
-    { x: W*0.68, y: H*0.10, r: W*0.13 },
-    { x: W*0.88, y: H*0.15, r: W*0.15 },
-    { x: W*0.50, y: H*0.05, r: W*0.10 },
-    { x: W*0.20, y: H*0.22, r: W*0.09 },
-    { x: W*0.78, y: H*0.20, r: W*0.10 },
-  ];
-  cloudDefs.forEach(c => {
-    const cg = sx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.r);
-    cg.addColorStop(0,   'rgba(80,5,0,0.45)');
-    cg.addColorStop(0.4, 'rgba(50,3,0,0.25)');
-    cg.addColorStop(0.8, 'rgba(20,1,0,0.10)');
-    cg.addColorStop(1,   'rgba(0,0,0,0)');
-    sx.fillStyle = cg;
-    sx.beginPath();
-    sx.ellipse(c.x, c.y, c.r, c.r*0.55, 0, 0, Math.PI*2);
-    sx.fill();
-  });
-
-  // Red vein-like cracks in the sky (like the reference)
-  sx.strokeStyle = 'rgba(180,15,0,0.18)';
-  sx.lineWidth = 1;
-  for (let i = 0; i < 14; i++) {
-    const vx = Math.random() * W;
-    const vy = Math.random() * H * 0.45;
-    sx.beginPath();
-    sx.moveTo(vx, vy);
-    let x = vx, y = vy;
-    for (let j = 0; j < 5; j++) {
-      x += (Math.random()-0.5)*120; y += Math.random()*40;
-      sx.lineTo(x, y);
-    }
-    sx.stroke();
-  }
-}
-
 // ─── DRAW SLASH BURST ─────────────────────────────────────────────────
 function drawSlashBurst(amt) {
-  // amt 0..1 — how far into burst phase
   slashes.forEach(s => {
     s.progress += dt * s.speed;
     if (s.progress > 1.5) {
-      // recycle
       s.progress = -(Math.random() * 0.3);
       s.x0 = Math.random();
       s.y0 = Math.random();
-      s.angle = (Math.random() - 0.5) * Math.PI * 0.6;
+      s.angle = Math.random() * Math.PI * 2; // <--- UPDATE THIS LINE
       s.len = 0.4 + Math.random() * 0.7;
     }
     if (s.progress < 0) return;
 
     const p = Math.min(s.progress, 1.0);
-    // The slash "draws" itself — tip travels from x0,y0 outward
     const diag = Math.sqrt(W*W + H*H);
     const totalLen = s.len * diag;
     const tipDist = p * totalLen;
@@ -626,7 +245,6 @@ function drawSlashBurst(amt) {
     X.lineWidth = s.width * (0.5 + p * 1.5);
     X.stroke();
 
-    // Afterglow on white slashes
     if (r > 200) {
       X.beginPath();
       X.moveTo(bx, by);
@@ -638,14 +256,12 @@ function drawSlashBurst(amt) {
   });
 }
 
-// ─── DRAW FLAMES ─────────────────────────────────────────────────────
 function drawFlames(alpha) {
   flames.forEach(f => {
     f.life += dt * f.speed;
     f.x += f.vx * dt;
     f.y += f.vy * dt;
     if (f.life > 1 || f.y < -0.1) {
-      // respawn at bottom
       f.x = Math.random();
       f.y = 0.72 + Math.random() * 0.3;
       f.life = 0;
@@ -663,13 +279,11 @@ function drawFlames(alpha) {
 
     const fg = X.createRadialGradient(fx, fy, 0, fx, fy - size*0.3, size);
     if (f.black) {
-      // Black cursed flame
       fg.addColorStop(0,   `rgba(10,0,0,${fa * 0.95})`);
       fg.addColorStop(0.3, `rgba(5,0,0,${fa * 0.7})`);
       fg.addColorStop(0.7, `rgba(60,5,0,${fa * 0.3})`);
       fg.addColorStop(1,   'rgba(0,0,0,0)');
     } else {
-      // Dark red flame
       fg.addColorStop(0,   `rgba(255,80,0,${fa * 0.9})`);
       fg.addColorStop(0.2, `rgba(200,20,0,${fa * 0.7})`);
       fg.addColorStop(0.6, `rgba(80,5,0,${fa * 0.35})`);
@@ -685,35 +299,6 @@ function drawFlames(alpha) {
   });
 }
 
-// ─── DRAW GROUND CRACKS ───────────────────────────────────────────────
-function drawGroundCracks(alpha) {
-  const ox = W * 0.5;
-  const oy = H * 0.67;  // horizon line
-
-  X.save();
-  X.globalAlpha = alpha;
-
-  GROUND_SLASHES.forEach(gs => {
-    const len = gs.len * W;
-    const ex = ox + Math.cos(gs.angle + Math.PI*0.5) * len * Math.cos(gs.offset * Math.PI);
-    const ey = oy + Math.sin(gs.angle) * len * 0.25;  // flattened for ground perspective
-
-    const gg = X.createLinearGradient(ox, oy, ex, ey);
-    gg.addColorStop(0,   `rgba(200,20,0,${0.5 * alpha})`);
-    gg.addColorStop(0.4, `rgba(140,10,0,${0.3 * alpha})`);
-    gg.addColorStop(1,   'rgba(0,0,0,0)');
-
-    X.beginPath();
-    X.moveTo(ox, oy);
-    X.lineTo(ex, ey);
-    X.strokeStyle = gg;
-    X.lineWidth = gs.width;
-    X.stroke();
-  });
-  X.restore();
-}
-
-// ─── DRAW LIGHTNING ───────────────────────────────────────────────────
 function drawLightning(alpha) {
   LIGHTNING.forEach(l => {
     l.timer += dt;
@@ -722,14 +307,12 @@ function drawLightning(alpha) {
       l.interval = 0.5 + Math.random() * 2.0;
       rebuildLightning(l);
     }
-    // Only visible briefly after firing
     const visible = l.timer < 0.12;
     if (!visible) return;
 
     const la = (1 - l.timer / 0.12) * alpha * 0.85;
     if (l.segments.length < 2) return;
 
-    // Main bolt
     X.beginPath();
     X.moveTo(l.segments[0].x, 0);
     l.segments.forEach(seg => X.lineTo(seg.x, seg.y));
@@ -737,7 +320,6 @@ function drawLightning(alpha) {
     X.lineWidth = 1.5;
     X.stroke();
 
-    // Glow pass
     X.beginPath();
     X.moveTo(l.segments[0].x, 0);
     l.segments.forEach(seg => X.lineTo(seg.x, seg.y));
@@ -747,14 +329,7 @@ function drawLightning(alpha) {
   });
 }
 
-// ─── DRAW SHRINE PHASE ───────────────────────────────────────────────
-function drawShrine(alpha, age) {
-  if (shrineSprite) {
-    X.globalAlpha = alpha;
-    X.drawImage(shrineSprite, 0, 0);
-    X.globalAlpha = 1;
-  }
-
+function drawOverlay(alpha, age) {
   // Pulsing red atmospheric glow
   const pulse = 0.85 + Math.sin(age * 1.4) * 0.15;
   const atmos = X.createRadialGradient(W*0.5, H*0.65, 0, W*0.5, H*0.65, W*0.7);
@@ -764,7 +339,6 @@ function drawShrine(alpha, age) {
   X.fillStyle = atmos;
   X.fillRect(0, 0, W, H);
 
-  drawGroundCracks(alpha * 0.7);
   drawFlames(alpha);
   drawLightning(alpha);
 }
@@ -773,7 +347,6 @@ function drawShrine(alpha, age) {
 const flashEl = document.getElementById('flash');
 const titleEl = document.getElementById('domain-title');
 const videoEl = document.getElementById('video-container');
-
 // ─── RENDER LOOP ──────────────────────────────────────────────────────
 function render(now) {
   requestAnimationFrame(render);
@@ -793,7 +366,6 @@ function render(now) {
     shake = 4.5;
     setTimeout(() => { flash = 0.7; shake = 3.0; }, 80);
     setTimeout(() => { flash = 0.4; }, 180);
-    // Reset slashes
     slashes.forEach((s, i) => {
       s.progress = -(i / SLASH_COUNT) * 0.4;
     });
@@ -807,7 +379,6 @@ function render(now) {
   // ── Phase progression ─────────────────────────────────────────
   if (phase === 'slash') {
     phaseT += dt;
-    // Violent continuous shake during slashes
     shake = Math.max(shake, 0.8 + Math.sin(phaseT * 22) * 0.4 + Math.random() * 0.9);
     if (phaseT > 1.8) {
       phase = 'settle';
@@ -825,24 +396,37 @@ function render(now) {
     }
   } else if (phase === 'shrine') {
     shrineT += dt;
-    shake = 0;
+    shake = Math.random() > 0.8 ? 0.5 : 0; // slight rumble due to continuous slashes
   } else if (phase === 'fadeout') {
     phaseT += dt;
     shrineT += dt;
     if (phaseT > 1.2) phase = 'idle';
   }
 
-  // ── Clear ─────────────────────────────────────────────────────
-  X.fillStyle = '#000';
-  X.fillRect(0, 0, W, H);
+  // ── 3D Render & Camera Pan ─────────────────────────────────────
+// ── 3D Render & Camera Pan ─────────────────────────────────────
+  if (phase === 'shrine' || phase === 'settle' || phase === 'fadeout') {
+    // Slowly orbit the camera around the Y axis
+    cameraAngle += dt * 0.18;
+    camera.position.x = Math.sin(cameraAngle) * 18;
+    camera.position.z = Math.cos(cameraAngle) * 18;
+    camera.position.y = 1; // <--- Lowered from 2 to 0.5
+    
+    // Look slightly upward at the center of the shrine 
+    camera.lookAt(0, -2, 0); 
+  }
+  renderer.render(scene, camera);
 
-  // ── Draw ──────────────────────────────────────────────────────
+  // ── 2D Canvas Clear ───────────────────────────────────────────
+  X.clearRect(0, 0, W, H); 
+
+  // ── 2D Canvas Draw ────────────────────────────────────────────
   if (phase === 'slash') {
+    webglCanvas.style.opacity = 0;
     const alpha = Math.min(phaseT / 0.2, 1.0);
-    // Dark red-black bg
     X.fillStyle = `rgba(8,0,0,1)`;
     X.fillRect(0, 0, W, H);
-    // Red energy burst from center
+    
     const burst = X.createRadialGradient(W*0.5, H*0.5, 0, W*0.5, H*0.5, Math.max(W,H)*0.6);
     burst.addColorStop(0,   `rgba(255,40,0,${alpha * 0.4})`);
     burst.addColorStop(0.2, `rgba(180,10,0,${alpha * 0.25})`);
@@ -855,20 +439,33 @@ function render(now) {
   } else if (phase === 'settle') {
     const p = Math.min(phaseT / 0.6, 1.0);
     const eased = 1 - Math.pow(1 - p, 3);
-    // Crossfade from slash chaos to shrine
-    X.fillStyle = '#000';
+    
+    webglCanvas.style.opacity = eased; // Fade in 3D scene
+    
+    // Draw black overlay over the parts of the fade-in that aren't fully opaque yet
+    X.fillStyle = `rgba(0,0,0,${1 - eased})`;
     X.fillRect(0, 0, W, H);
-    drawSlashBurst(1 - eased);
-    drawShrine(eased, shrineT);
+    
+    drawSlashBurst(1.0); 
+    drawOverlay(eased, shrineT);
 
   } else if (phase === 'shrine') {
-    drawShrine(1.0, shrineT);
+    webglCanvas.style.opacity = 1.0;
+    
+    // The continuous slashes requested for the domain phase
+    drawSlashBurst(1.0); 
+    drawOverlay(1.0, shrineT);
 
   } else if (phase === 'fadeout') {
     const alpha = 1 - Math.min(phaseT / 1.2, 1.0);
-    drawShrine(alpha, shrineT);
+    webglCanvas.style.opacity = alpha;
+    
+    X.fillStyle = `rgba(0,0,0,${1 - alpha})`;
+    X.fillRect(0, 0, W, H);
+    drawOverlay(alpha, shrineT);
 
   } else {
+    webglCanvas.style.opacity = 0;
     X.fillStyle = '#000';
     X.fillRect(0, 0, W, H);
   }
