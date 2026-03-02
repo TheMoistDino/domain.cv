@@ -4,7 +4,7 @@ The project was inspired by the iconic supernatural combat in the anime *Jujutsu
 
 ### **How we built the Backend**
 
-The backend serves as the project's high-frequency "Kinematic Logic Engine."
+The backend serves as the project's high-frequency "Kinematic Logic Engine".
 
 * **Infrastructure**: We built a modular directory structure to separate the core computer vision logic from the server communication layers.
 * **Hand Tracking**: We implemented a `HandTracker` class utilizing **MediaPipe** to extract 21 3D landmarks for up to two hands. We customized this to convert normalized coordinates into actual pixel coordinates for more intuitive geometric calculations.
@@ -31,6 +31,11 @@ $$\theta = \arccos\left(\frac{\mathbf{A} \cdot \mathbf{B}}{|\mathbf{A}| |\mathbf
 
 * **The Occlusion Problem**: Many canonical hand signs involve intertwined fingers, which causes MediaPipe's bounding boxes to merge or fail. We solved this by implementing "Lore-Accurate Pivots," such as using the **Kon (Divine Dog)** sign for Megumi's domain, which provides higher tracking stability while remaining true to the character's abilities.
 * **Environment Stability**: We encountered significant `AttributeErrors` with MediaPipe's C++ bindings on Python 3.13. We successfully diagnosed and pivoted the entire team to a stable Python 3.12 environment mid-hackathon to maintain the development timeline.
+* **CORS & Asset Security**: Standard browser security initially blocked our 3D `.glb` models from loading via the `file:///` protocol. We resolved this by shifting to a local Python-hosted server, ensuring the frontend had secure access to external 3D assets.
+* **ES Module Scoping**: Transitioning the 3D engines to modern ES Modules caused "silent failures" where the master controller could not access private engine functions. We fixed this by explicitly binding each engine to the global `window` object to bridge the gap between module-based and script-based logic.
+* **WebGL Context Management**: Rapidly switching between raw WebGL and Three.js environments initially triggered "Too many active WebGL contexts" warnings. We prevented crashes by implementing state-driven "Instant Kill Switches" that clear renderers and hide groups to halt draw calls immediately without losing context.
+* **Coordinate System Transformation**: We bypassed complex projection matrices by decoupling 2D cinematic slashes (pixel-based on `fx-canvas`) from 3D unit-based scenes. We aligned them by locking camera focus on specific 3D targets and syncing 2D origin points to the center of the screen.
+* **Responsive Camera Scaling**: To prevent the fixed Picture-in-Picture (PiP) feed from overlapping critical 3D structures on smaller screens, we used CSS fixed positioning and "Dead-Space Positioning" for 3D assets. We also dynamically rescaled Three.js projection matrices and aspect ratios to maintain visual integrity across all window sizes.
 
 ### **What we learned**
 
