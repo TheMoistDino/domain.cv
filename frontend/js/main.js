@@ -157,6 +157,21 @@ function triggerCinematic(domain) {
             if (window.HigurumaEngine) window.HigurumaEngine.init();
             break;
 
+        case "summon_mahoraga":
+        case "mahoraga":
+            if (titleEn) titleEn.innerText = "DIVINE GENERAL MAHORAGA";
+            if (titleJp) titleJp.innerText = "八握剣異戒神将魔虚羅";
+            
+            if (titleContainer) {
+                titleContainer.style.textShadow = "0 0 20px rgba(255,215,0,.8), 0 0 50px rgba(255,255,255,.6)";
+                titleContainer.style.color = "rgba(255,215,0,.9)";
+            }
+            if (flashEl) flashEl.style.background = "#ffffff"; 
+            
+            window.currentDomain = "mahoraga"; 
+            if (window.MahoragaEngine) window.MahoragaEngine.init();
+            break;
+
         default:
             if (titleEn) titleEn.innerText = "";
             if (titleJp) titleJp.innerText = "";
